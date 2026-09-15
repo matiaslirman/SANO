@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Sano">
+  <polygon points="120,4 144.3,29.2 178,19.5 186.5,53.5 220.5,62 210.8,95.7 236,120 210.8,144.3 220.5,178 186.5,186.5 178,220.5 144.3,210.8 120,236 95.7,210.8 62,220.5 53.5,186.5 19.5,178 29.2,144.3 4,120 29.2,95.7 19.5,62 53.5,53.5 62,19.5 95.7,29.2" fill="#FFF1B4"/>
+  <circle cx="120" cy="120" r="93" fill="#921A1B"/>
+  <g fill="#FFF1B4">
+    <!-- fork -->
+    <rect x="86" y="74" width="7" height="40" rx="3.5"/>
+    <rect x="98" y="74" width="7" height="40" rx="3.5"/>
+    <rect x="110" y="74" width="7" height="40" rx="3.5"/>
+    <path d="M86 108 h31 l-8 20 h-15 z"/>
+    <rect x="97" y="124" width="9" height="46" rx="4.5"/>
+  </g>
+  <g fill="none" stroke="#FFF1B4" stroke-width="7"><circle cx="150" cy="122" r="30"/></g>
+  <g fill="none" stroke="#FFF1B4" stroke-width="4"><circle cx="150" cy="122" r="19"/></g>
+</svg>
