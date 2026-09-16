@@ -207,6 +207,9 @@ img,svg{max-width:100%}
 .sticky .stag{font-size:11px;color:var(--bordo-ink);background:var(--crema);border-radius:999px;padding:2px 9px;font-weight:700;display:inline-block;margin-left:8px;font-family:var(--disp);letter-spacing:.04em;vertical-align:middle}
 .sticky .go{margin-left:auto;border:0;background:var(--crema);color:var(--bordo-ink);font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:1rem;padding:15px 22px;border-radius:12px;white-space:nowrap}
 .sticky .go:hover{background:#fff}
+.sticky .go.wa{background:var(--wa-deep);color:#fff;display:inline-flex;align-items:center;gap:8px}
+.sticky .go.wa:hover{background:#1c9a4e}
+.sticky .go:disabled{cursor:not-allowed}
 
 /* ============ FOOTER ============ */
 footer{background:var(--bordo-darker);color:var(--crema-soft);margin-top:44px}

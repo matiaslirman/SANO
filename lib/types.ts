@@ -53,6 +53,7 @@ export interface Order {
   marketTotal: number;
   total: number;
   status: OrderStatus;
+  completed?: boolean; // "tachado" — entregado/completado por el dueño
 }
 
 export interface PublicStatus {

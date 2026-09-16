@@ -22,7 +22,6 @@ export function Ordering({
   const [dishQty, setDishQty] = useState<Record<string, number>>({});
   const [marketQty, setMarketQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
   const [notes, setNotes] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -134,15 +133,48 @@ export function Ordering({
   const scrollToCheckout = () =>
     document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  function buildWaMessage(order: Order): string {
+    const L: string[] = [];
+    L.push("¡Hola Sano! 👋 Quiero confirmar mi pedido:");
+    L.push("");
+    L.push(`*Orden ${order.id}* · ${order.customerName}`);
+    L.push(order.windowLabel); // ej. "Entrega Viernes 18 sep"
+
+    if (order.dishes.length) {
+      L.push("");
+      L.push("*PLATOS LISTOS SANO*");
+      order.dishes.forEach((d) => L.push(`x${d.qty}  ${d.name}`));
+    }
+    if (order.market.length) {
+      L.push("");
+      L.push("*SANO MARKET*");
+      order.market.forEach((m) => L.push(`x${m.qty}  ${m.name} — ${crc(m.subtotal)}`));
+    }
+
+    L.push("");
+    const combo = comboLabel(order.dishesQty, status.combos);
+    const parts: string[] = [];
+    if (order.dishesQty > 0) {
+      parts.push(
+        combo
+          ? `${combo} platos ${crc(order.dishesTotal)}`
+          : `${order.dishesQty} platos ${crc(order.dishesTotal)}`
+      );
+    }
+    if (order.marketTotal > 0) parts.push(`Market ${crc(order.marketTotal)}`);
+    L.push(`*TOTAL: ${crc(order.total)}*`);
+    if (parts.length > 1) L.push(`(${parts.join(" + ")})`);
+    else if (combo) L.push(`(${combo})`);
+
+    if (order.notes) {
+      L.push("");
+      L.push(`📝 ${order.notes}`);
+    }
+    return L.join("\n");
+  }
+
   function buildWaLink(order: Order) {
-    const parts = ["Hola Sano 👋 Confirmo mi pedido", `N° ${order.id}`, `Nombre: ${order.customerName}`];
-    const bits: string[] = [];
-    if (order.dishesQty) bits.push(`${order.dishesQty} platos`);
-    const mq = order.market.reduce((s, m) => s + m.qty, 0);
-    if (mq) bits.push(`${mq} de Market`);
-    if (bits.length) parts.push(bits.join(" + "));
-    parts.push(`Total: ${crc(order.total)}`);
-    return `https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`;
+    return `https://wa.me/${WA}?text=${encodeURIComponent(buildWaMessage(order))}`;
   }
 
   async function submit() {
@@ -152,7 +184,6 @@ export function Ordering({
     try {
       const payload = {
         customerName: name.trim(),
-        whatsapp: whatsapp.trim(),
         notes: notes.trim(),
         dishes: Object.entries(dishQty)
           .filter(([, q]) => q > 0)
@@ -189,7 +220,6 @@ export function Ordering({
   function newOrder() {
     setCreated(null);
     setName("");
-    setWhatsapp("");
     setNotes("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -406,10 +436,6 @@ export function Ordering({
                     <input id="nm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: María Fernández" />
                   </div>
                   <div className="field">
-                    <label htmlFor="wa">WhatsApp</label>
-                    <input id="wa" type="tel" inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ej: 8888 8888" />
-                  </div>
-                  <div className="field">
                     <label htmlFor="nt">Restricciones o ajustes menores</label>
                     <textarea id="nt" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej: sin cebolla, alérgico a maní…" />
                     <div className="hint">
@@ -521,15 +547,30 @@ export function Ordering({
       <div className={`sticky${totals.grand > 0 && !created ? " show" : ""}`}>
         <div className="wrap">
           <div className="sinfo">
-            <span className="scount">{totals.dishesQty} platos · toca continuar</span>
+            <span className="scount">
+              {totals.dishesQty} platos · {soldOut ? "sin cupos" : canSubmit ? "listo para enviar" : "toca continuar"}
+            </span>
             <span className="stotal tnum">
               {crc(totals.grand)}
               {combo && <span className="stag">{combo}</span>}
             </span>
           </div>
-          <button className="go" onClick={scrollToCheckout}>
-            Continuar →
-          </button>
+          {soldOut ? (
+            <button className="go" disabled style={{ opacity: 0.65 }}>
+              Sin cupos
+            </button>
+          ) : canSubmit ? (
+            <button className="go wa" onClick={submit} disabled={submitting}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2m0 18.15c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24s8.24 3.7 8.24 8.24-3.7 8.24-8.24 8.24m4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12s-.64.81-.79.97c-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72s-.02-.38.11-.5c.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43s-.56-1.34-.76-1.84c-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31s-.86.85-.86 2.07.89 2.4 1.01 2.56c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.22-.17-.47-.29" />
+              </svg>
+              {submitting ? "Enviando…" : "Confirmar por WhatsApp"}
+            </button>
+          ) : (
+            <button className="go" onClick={scrollToCheckout}>
+              Continuar →
+            </button>
+          )}
         </div>
       </div>
       <div style={{ height: totals.grand > 0 && !created ? 84 : 0 }} />

@@ -57,19 +57,35 @@ export function OrdersView({ initial }: { initial: Data }) {
     return () => clearInterval(id);
   }, [refetch]);
 
-  async function togglePaid(o: Order) {
+  async function patchOrder(o: Order, patch: { status?: Order["status"]; completed?: boolean }) {
     setBusyId(o.id);
-    const nextStatus = o.status === "pagado" ? "pendiente" : "pagado";
     try {
       const r = await fetch(`/api/orders/${o.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify(patch),
       });
       const d = await r.json();
       if (r.ok) {
         setOrders((prev) => prev.map((x) => (x.id === o.id ? d.order : x)));
         setCupos(d.cupos);
+      }
+    } finally {
+      setBusyId("");
+    }
+  }
+  const togglePaid = (o: Order) =>
+    patchOrder(o, { status: o.status === "pagado" ? "pendiente" : "pagado" });
+  const toggleCompleted = (o: Order) => patchOrder(o, { completed: !o.completed });
+
+  async function removeOrder(o: Order) {
+    if (!confirm(`¿Eliminar el pedido ${o.id} de ${o.customerName}?\nEsta acción no se puede deshacer.`)) return;
+    setBusyId(o.id);
+    try {
+      const r = await fetch(`/api/orders/${o.id}`, { method: "DELETE" });
+      if (r.ok) {
+        setOrders((prev) => prev.filter((x) => x.id !== o.id));
+        refetch();
       }
     } finally {
       setBusyId("");
@@ -122,7 +138,7 @@ export function OrdersView({ initial }: { initial: Data }) {
             <span>Estado</span>
           </div>
           {orders.map((o) => (
-            <div className="orow" key={o.id}>
+            <div className={`orow${o.completed ? " done" : ""}`} key={o.id}>
               <span className="ono">{o.id}</span>
               <span className="oname">
                 {o.customerName}
@@ -136,12 +152,18 @@ export function OrdersView({ initial }: { initial: Data }) {
                 {o.notes ? ` — 📝 ${o.notes}` : ""}
               </span>
               <span className="ototal tnum">{crc(o.total)}</span>
-              <span className="oact" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
-                <span className={`pill ${o.status === "pagado" ? "paid" : "pend"}`}>
-                  {o.status === "pagado" ? "Pagado" : "Pendiente"}
+              <span className="oact" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                <span className={`pill ${o.completed ? "done" : o.status === "pagado" ? "paid" : "pend"}`}>
+                  {o.completed ? "Completado" : o.status === "pagado" ? "Pagado" : "Pendiente"}
                 </span>
                 <button className={`obtn ${o.status === "pagado" ? "paid" : ""}`} onClick={() => togglePaid(o)} disabled={busyId === o.id}>
-                  {busyId === o.id ? "…" : o.status === "pagado" ? "Deshacer" : "Marcar pagado"}
+                  {busyId === o.id ? "…" : o.status === "pagado" ? "Deshacer pago" : "Marcar pagado"}
+                </button>
+                <button className="obtn" onClick={() => toggleCompleted(o)} disabled={busyId === o.id}>
+                  {o.completed ? "Reabrir" : "Completar"}
+                </button>
+                <button className="obtn danger" onClick={() => removeOrder(o)} disabled={busyId === o.id} title="Eliminar pedido" aria-label="Eliminar pedido">
+                  ✕
                 </button>
               </span>
             </div>

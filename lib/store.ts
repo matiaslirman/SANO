@@ -16,9 +16,35 @@ const K = {
 };
 
 // ── Backend selection ─────────────────────────────────────────
+// Detecta las credenciales del store Redis (Upstash / Vercel KV) sin importar
+// el nombre exacto que Vercel les haya puesto (con o sin prefijo). Prueba los
+// nombres conocidos y, si no, escanea cualquier variable *REST_API_URL /
+// *REDIS_REST_URL y su token de escritura.
 function kvEnv() {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  const e = process.env;
+  let url =
+    e.KV_REST_API_URL ||
+    e.UPSTASH_REDIS_REST_URL ||
+    e.REDIS_REST_API_URL ||
+    "";
+  let token =
+    e.KV_REST_API_TOKEN ||
+    e.UPSTASH_REDIS_REST_TOKEN ||
+    e.REDIS_REST_API_TOKEN ||
+    "";
+
+  if (!url) {
+    const key = Object.keys(e).find(
+      (k) => /(REST_API_URL|REDIS_REST_URL)$/i.test(k) && String(e[k]).startsWith("https://")
+    );
+    if (key) url = e[key] || "";
+  }
+  if (!token) {
+    const key = Object.keys(e).find(
+      (k) => /(REST_API_TOKEN|REDIS_REST_TOKEN)$/i.test(k) && !/READ_ONLY/i.test(k) && e[k]
+    );
+    if (key) token = e[key] || "";
+  }
   return url && token ? { url, token } : null;
 }
 
@@ -166,6 +192,7 @@ export const store = {
       marketTotal,
       total: dishesTotal + marketTotal,
       status: "pendiente",
+      completed: false,
     };
 
     if (isPersistent()) {
@@ -178,10 +205,14 @@ export const store = {
     return order;
   },
 
-  async updateOrderStatus(id: string, status: OrderStatus): Promise<Order | null> {
+  async updateOrder(
+    id: string,
+    patch: { status?: OrderStatus; completed?: boolean }
+  ): Promise<Order | null> {
     const order = await this.getOrder(id);
     if (!order) return null;
-    order.status = status;
+    if (patch.status === "pendiente" || patch.status === "pagado") order.status = patch.status;
+    if (typeof patch.completed === "boolean") order.completed = patch.completed;
     if (isPersistent()) {
       await redis().hset(K.orders, { [id]: order });
     } else {
