@@ -36,8 +36,9 @@ export async function GET() {
   const orders = await store.listOrders();
   const cupos = await store.computeCupos();
   const win = getNextWindow();
+  const kitchenDone = await store.getKitchenDone(win.id);
   return NextResponse.json(
-    { orders, cupos, window: { id: win.id, label: win.shortLabel } },
+    { orders, cupos, window: { id: win.id, label: win.shortLabel }, kitchenDone },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

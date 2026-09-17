@@ -13,6 +13,7 @@ const K = {
   market: "sano:market",
   orders: "sano:orders", // hash: id -> Order
   seq: "sano:orderseq",
+  kitchen: "sano:kitchen", // hash: windowId -> string[] (claves de ítems completados)
 };
 
 // ── Backend selection ─────────────────────────────────────────
@@ -233,6 +234,33 @@ export const store = {
     }
   },
 
+  /** Ítems del resumen de cocina marcados como completados en una ventana. */
+  async getKitchenDone(windowId: string): Promise<string[]> {
+    if (isPersistent()) {
+      return (await redis().hget<string[]>(K.kitchen, windowId)) || [];
+    }
+    const db = await readFile();
+    return db.kitchen?.[windowId] || [];
+  },
+
+  /** Marca/desmarca un ítem del resumen de cocina; devuelve la lista actualizada. */
+  async setKitchenItemDone(windowId: string, key: string, done: boolean): Promise<string[]> {
+    const current = await this.getKitchenDone(windowId);
+    const set = new Set(current);
+    if (done) set.add(key);
+    else set.delete(key);
+    const next = Array.from(set);
+    if (isPersistent()) {
+      await redis().hset(K.kitchen, { [windowId]: next });
+    } else {
+      const db = await readFile();
+      db.kitchen = db.kitchen || {};
+      db.kitchen[windowId] = next;
+      await writeFile(db);
+    }
+    return next;
+  },
+
   async nextSeq(): Promise<number> {
     if (isPersistent()) {
       return await redis().incr(K.seq);
@@ -266,6 +294,7 @@ interface DbFile {
   market: MarketCategory[];
   orders: Record<string, Order>;
   seq: number;
+  kitchen?: Record<string, string[]>;
 }
 
 function dataFile(): string {
@@ -284,9 +313,10 @@ async function readFile(): Promise<DbFile> {
       market: parsed.market || DEFAULT_MARKET,
       orders: parsed.orders || {},
       seq: parsed.seq || 0,
+      kitchen: parsed.kitchen || {},
     };
   } catch {
-    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0 };
+    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0, kitchen: {} };
   }
 }
 
