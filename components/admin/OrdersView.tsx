@@ -3,20 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
+import { WindowTabs, deriveWindows, pastPendingOrders, type WinOpt } from "./WindowTabs";
 
 interface Cupos {
   totales: number;
   disponibles: number;
   confirmados: number;
 }
-interface Win {
-  id: string;
-  label: string;
-}
 interface Data {
   orders: Order[];
   cupos: Cupos;
-  window: Win;
+  window: WinOpt;
 }
 
 const fmtDate = (iso: string) =>
@@ -36,7 +33,8 @@ function itemsSummary(o: Order): string {
 export function OrdersView({ initial }: { initial: Data }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const [cupos, setCupos] = useState<Cupos>(initial.cupos);
-  const [win, setWin] = useState<Win>(initial.window);
+  const [activeWin, setActiveWin] = useState<WinOpt>(initial.window);
+  const [selWin, setSelWin] = useState<string>(initial.window.id);
   const [busyId, setBusyId] = useState<string>("");
 
   const refetch = useCallback(async () => {
@@ -46,7 +44,7 @@ export function OrdersView({ initial }: { initial: Data }) {
       const d: Data = await r.json();
       setOrders(d.orders);
       setCupos(d.cupos);
-      setWin(d.window);
+      setActiveWin(d.window);
     } catch {
       /* silencioso */
     }
@@ -78,6 +76,33 @@ export function OrdersView({ initial }: { initial: Data }) {
     patchOrder(o, { status: o.status === "pagado" ? "pendiente" : "pagado" });
   const toggleCompleted = (o: Order) => patchOrder(o, { completed: !o.completed });
 
+  async function renumberOrder(o: Order) {
+    const input = window.prompt(
+      `Nuevo número de orden para ${o.customerName} (actual: ${o.seq}).\nSe usa para alinear con la numeración real del sistema.`,
+      String(o.seq)
+    );
+    if (input == null) return;
+    const n = parseInt(input.trim(), 10);
+    if (!Number.isFinite(n) || n < 1) {
+      alert("Ingresá un número válido (mayor a 0).");
+      return;
+    }
+    if (n === o.seq) return;
+    setBusyId(o.id);
+    try {
+      const r = await fetch(`/api/orders/${o.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ renumber: n }),
+      });
+      const d = await r.json();
+      if (r.ok) refetch();
+      else alert(d.error || "No se pudo renumerar el pedido.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function removeOrder(o: Order) {
     if (!confirm(`¿Eliminar el pedido ${o.id} de ${o.customerName}?\nEsta acción no se puede deshacer.`)) return;
     setBusyId(o.id);
@@ -92,18 +117,44 @@ export function OrdersView({ initial }: { initial: Data }) {
     }
   }
 
+  const windows = useMemo(() => deriveWindows(orders, activeWin), [orders, activeWin]);
+  const selLabel = selWin === "all" ? "Todas las ventanas" : windows.find((w) => w.id === selWin)?.label || activeWin.label;
+
+  const scoped = useMemo(
+    () => (selWin === "all" ? orders : orders.filter((o) => o.windowId === selWin)),
+    [orders, selWin]
+  );
+
+  const pending = useMemo(() => pastPendingOrders(orders, activeWin.id), [orders, activeWin.id]);
+  const jumpWin = useMemo(() => pending.reduce((mx, o) => (o.windowId > mx ? o.windowId : mx), ""), [pending]);
+
   const stats = useMemo(() => {
-    const inWindow = orders.filter((o) => o.windowId === win.id);
-    const paidWindow = inWindow.filter((o) => o.status === "pagado");
-    const revenue = paidWindow.reduce((s, o) => s + o.total, 0);
-    return { pedidos: inWindow.length, confirmados: paidWindow.length, revenue };
-  }, [orders, win.id]);
+    const paid = scoped.filter((o) => o.status === "pagado");
+    const revenue = paid.reduce((s, o) => s + o.total, 0);
+    const disponibles =
+      selWin === "all" ? cupos.disponibles : Math.max(0, cupos.totales - paid.length);
+    return { pedidos: scoped.length, confirmados: paid.length, revenue, disponibles };
+  }, [scoped, selWin, cupos]);
 
   return (
     <>
+      {pending.length > 0 && selWin !== jumpWin && (
+        <div className="walert">
+          <span>
+            ⚠️ Tenés <b>{pending.length}</b> pedido{pending.length > 1 ? "s" : ""} de entregas anteriores sin
+            completar — no se te pierden.
+          </span>
+          <button className="walert-btn" onClick={() => setSelWin(jumpWin)}>
+            Ver esos pedidos →
+          </button>
+        </div>
+      )}
+
+      <WindowTabs windows={windows} selected={selWin} activeId={activeWin.id} onSelect={setSelWin} includeAll />
+
       <div className="astat">
         <div className="box">
-          <div className="k">Pedidos · {win.label}</div>
+          <div className="k">Pedidos · {selWin === "all" ? "Todas" : selLabel.replace(/^Entrega\s+/i, "")}</div>
           <div className="v">{stats.pedidos}</div>
         </div>
         <div className="box">
@@ -113,7 +164,7 @@ export function OrdersView({ initial }: { initial: Data }) {
         <div className="box accent">
           <div className="k">Cupos disponibles</div>
           <div className="v">
-            {cupos.disponibles} / {cupos.totales}
+            {stats.disponibles} / {cupos.totales}
           </div>
         </div>
         <div className="box">
@@ -122,10 +173,10 @@ export function OrdersView({ initial }: { initial: Data }) {
         </div>
       </div>
 
-      {orders.length === 0 ? (
+      {scoped.length === 0 ? (
         <div className="otable">
           <div className="empty" style={{ padding: 20 }}>
-            Todavía no hay pedidos. Aparecerán acá apenas un cliente envíe uno.
+            No hay pedidos en esta ventana.
           </div>
         </div>
       ) : (
@@ -137,9 +188,16 @@ export function OrdersView({ initial }: { initial: Data }) {
             <span>Total</span>
             <span>Estado</span>
           </div>
-          {orders.map((o) => (
+          {scoped.map((o) => (
             <div className={`orow${o.completed ? " done" : ""}`} key={o.id}>
-              <span className="ono">{o.id}</span>
+              <button
+                className="ono ono-btn"
+                onClick={() => renumberOrder(o)}
+                disabled={busyId === o.id}
+                title="Editar número de orden"
+              >
+                {o.id}
+              </button>
               <span className="oname">
                 {o.customerName}
                 <small>
@@ -173,7 +231,7 @@ export function OrdersView({ initial }: { initial: Data }) {
 
       <p className="wa-note" style={{ textAlign: "left", marginTop: 12 }}>
         Al marcar un pedido como <b>pagado</b> se descuenta 1 cupo automáticamente del contador que ven los
-        clientes. Se actualiza solo cada 15 s.
+        clientes. Se actualiza solo cada 15 s. Tocá el <b>N°</b> de un pedido para ajustarlo a tu numeración real.
       </p>
     </>
   );

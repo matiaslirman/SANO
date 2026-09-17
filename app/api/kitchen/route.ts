@@ -6,15 +6,17 @@ import { getNextWindow } from "@/lib/windows";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Estado del checklist de cocina para la ventana activa (solo admin). */
-export async function GET() {
+/** Estado del checklist de cocina para una ventana (por defecto la activa; solo admin). */
+export async function GET(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  const win = getNextWindow();
-  const done = await store.getKitchenDone(win.id);
+  const active = getNextWindow();
+  const qWindow = new URL(req.url).searchParams.get("windowId");
+  const windowId = (qWindow || active.id).slice(0, 40);
+  const done = await store.getKitchenDone(windowId);
   return NextResponse.json(
-    { window: { id: win.id, label: win.shortLabel }, done },
+    { windowId, window: { id: active.id, label: active.shortLabel }, done },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

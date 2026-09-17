@@ -16,6 +16,10 @@ const K = {
   kitchen: "sano:kitchen", // hash: windowId -> string[] (claves de ítems completados)
 };
 
+// Piso del contador de órdenes: el próximo número real del negocio arranca en 223.
+// El contador nunca baja de acá, así los IDs siguen la numeración real (SANO-223, 224…).
+const ORDER_SEQ_FLOOR = 222;
+
 // ── Backend selection ─────────────────────────────────────────
 // Detecta las credenciales del store Redis (Upstash / Vercel KV) sin importar
 // el nombre exacto que Vercel les haya puesto (con o sin prefijo). Prueba los
@@ -176,7 +180,7 @@ export const store = {
     const marketTotal = marketLines.reduce((s, l) => s + l.subtotal, 0);
 
     const seq = await this.nextSeq();
-    const id = `SANO-${1000 + seq}`;
+    const id = `SANO-${seq}`;
     const order: Order = {
       id,
       seq,
@@ -274,12 +278,40 @@ export const store = {
 
   async nextSeq(): Promise<number> {
     if (isPersistent()) {
+      // Asegura el piso antes de incrementar: el próximo número nunca baja del real del negocio.
+      const cur = await redis().get<number>(K.seq);
+      if (typeof cur !== "number" || cur < ORDER_SEQ_FLOOR) {
+        await redis().set(K.seq, ORDER_SEQ_FLOOR);
+      }
       return await redis().incr(K.seq);
     }
     const db = await readFile();
-    db.seq = (db.seq || 0) + 1;
+    db.seq = Math.max(db.seq || 0, ORDER_SEQ_FLOOR) + 1;
     await writeFile(db);
     return db.seq;
+  },
+
+  /** Cambia el número de un pedido (renumerar). Devuelve el pedido con el nuevo ID. */
+  async renumberOrder(oldId: string, newNumber: number): Promise<Order | null> {
+    const order = await this.getOrder(oldId);
+    if (!order) return null;
+    const seq = Math.max(1, Math.floor(newNumber));
+    const newId = `SANO-${seq}`;
+    if (newId !== oldId && (await this.getOrder(newId))) {
+      throw new Error(`Ya existe un pedido ${newId}`);
+    }
+    order.id = newId;
+    order.seq = seq;
+    if (isPersistent()) {
+      if (newId !== oldId) await redis().hdel(K.orders, oldId);
+      await redis().hset(K.orders, { [newId]: order });
+    } else {
+      const db = await readFile();
+      if (newId !== oldId) delete db.orders[oldId];
+      db.orders[newId] = order;
+      await writeFile(db);
+    }
+    return order;
   },
 
   /** Cupos disponibles = totales − pedidos confirmados (pagados) de la ventana activa. */
