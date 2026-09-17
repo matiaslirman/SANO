@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  let body: { windowId?: string; key?: string; done?: boolean };
+  let body: { windowId?: string; key?: string; done?: boolean; qty?: number };
   try {
     body = await req.json();
   } catch {
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   if (!key || typeof body.done !== "boolean") {
     return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
   }
-  const done = await store.setKitchenItemDone(windowId, key, body.done);
+  const qty = Number.isFinite(body.qty) ? Math.max(0, Math.floor(body.qty as number)) : 0;
+  const done = await store.setKitchenItemDone(windowId, key, body.done, qty);
   return NextResponse.json({ windowId, done });
 }

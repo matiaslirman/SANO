@@ -234,31 +234,42 @@ export const store = {
     }
   },
 
-  /** Ítems del resumen de cocina marcados como completados en una ventana. */
-  async getKitchenDone(windowId: string): Promise<string[]> {
+  /**
+   * Ítems del resumen de cocina completados en una ventana, como mapa
+   * `clave -> cantidad completada`. Guardar la cantidad permite reabrir un
+   * ítem cuando entran pedidos nuevos que la aumentan (trazabilidad de lo
+   * que falta producir).
+   */
+  async getKitchenDone(windowId: string): Promise<Record<string, number>> {
+    let raw: unknown;
     if (isPersistent()) {
-      return (await redis().hget<string[]>(K.kitchen, windowId)) || [];
+      raw = await redis().hget(K.kitchen, windowId);
+    } else {
+      const db = await readFile();
+      raw = db.kitchen?.[windowId];
     }
-    const db = await readFile();
-    return db.kitchen?.[windowId] || [];
+    return normalizeKitchen(raw);
   },
 
-  /** Marca/desmarca un ítem del resumen de cocina; devuelve la lista actualizada. */
-  async setKitchenItemDone(windowId: string, key: string, done: boolean): Promise<string[]> {
+  /** Marca/desmarca un ítem; al marcar guarda la cantidad. Devuelve el mapa actualizado. */
+  async setKitchenItemDone(
+    windowId: string,
+    key: string,
+    done: boolean,
+    qty: number
+  ): Promise<Record<string, number>> {
     const current = await this.getKitchenDone(windowId);
-    const set = new Set(current);
-    if (done) set.add(key);
-    else set.delete(key);
-    const next = Array.from(set);
+    if (done) current[key] = Math.max(0, Math.floor(qty) || 0);
+    else delete current[key];
     if (isPersistent()) {
-      await redis().hset(K.kitchen, { [windowId]: next });
+      await redis().hset(K.kitchen, { [windowId]: current });
     } else {
       const db = await readFile();
       db.kitchen = db.kitchen || {};
-      db.kitchen[windowId] = next;
+      db.kitchen[windowId] = current;
       await writeFile(db);
     }
-    return next;
+    return current;
   },
 
   async nextSeq(): Promise<number> {
@@ -289,12 +300,35 @@ export const store = {
 };
 
 // ── File backend (solo desarrollo local / fallback) ───────────
+/**
+ * Normaliza el valor guardado del checklist de cocina a `clave -> cantidad`.
+ * Tolera el formato viejo (array de claves completadas) tratándolo como
+ * "completado sin límite de cantidad".
+ */
+function normalizeKitchen(raw: unknown): Record<string, number> {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    const out: Record<string, number> = {};
+    for (const k of raw) if (typeof k === "string") out[k] = Number.MAX_SAFE_INTEGER;
+    return out;
+  }
+  if (typeof raw === "object") {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const n = Number(v);
+      if (Number.isFinite(n)) out[k] = n;
+    }
+    return out;
+  }
+  return {};
+}
+
 interface DbFile {
   settings: Settings;
   market: MarketCategory[];
   orders: Record<string, Order>;
   seq: number;
-  kitchen?: Record<string, string[]>;
+  kitchen?: Record<string, Record<string, number>>;
 }
 
 function dataFile(): string {

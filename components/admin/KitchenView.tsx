@@ -34,13 +34,13 @@ function aggregate(orders: Order[], onlyPaid: boolean) {
 function Bars({
   rows,
   kind,
-  done,
+  isDone,
   onToggle,
 }: {
   rows: [string, number][];
   kind: Kind;
-  done: Set<string>;
-  onToggle: (key: string, next: boolean) => void;
+  isDone: (key: string, qty: number) => boolean;
+  onToggle: (key: string, qty: number, next: boolean) => void;
 }) {
   const max = rows.length ? rows[0][1] : 1;
   if (rows.length === 0) return <div className="empty" style={{ padding: 16 }}>Sin ítems todavía.</div>;
@@ -48,18 +48,18 @@ function Bars({
     <div className="kgrid">
       {rows.map(([name, qty]) => {
         const key = itemKey(kind, name);
-        const isDone = done.has(key);
+        const done = isDone(key, qty);
         return (
-          <div className={`krow${isDone ? " done" : ""}`} key={key}>
+          <div className={`krow${done ? " done" : ""}`} key={key}>
             <button
               type="button"
               className="kcheck"
-              aria-pressed={isDone}
-              aria-label={isDone ? `Reabrir ${name}` : `Completar ${name}`}
-              title={isDone ? "Reabrir" : "Marcar completado"}
-              onClick={() => onToggle(key, !isDone)}
+              aria-pressed={done}
+              aria-label={done ? `Reabrir ${name}` : `Completar ${name}`}
+              title={done ? "Reabrir" : "Marcar completado"}
+              onClick={() => onToggle(key, qty, !done)}
             >
-              {isDone ? "✓" : ""}
+              {done ? "✓" : ""}
             </button>
             <span className="kqty tnum">{qty}×</span>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -75,17 +75,18 @@ function Bars({
   );
 }
 
-function progress(rows: [string, number][], kind: Kind, done: Set<string>) {
-  const total = rows.length;
-  const listos = rows.reduce((n, [name]) => n + (done.has(itemKey(kind, name)) ? 1 : 0), 0);
-  return { total, listos };
-}
-
-export function KitchenView({ initial }: { initial: { orders: Order[]; window: Win; done: string[] } }) {
+export function KitchenView({
+  initial,
+}: {
+  initial: { orders: Order[]; window: Win; done: Record<string, number> };
+}) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const [win, setWin] = useState<Win>(initial.window);
   const [onlyPaid, setOnlyPaid] = useState(false);
-  const [done, setDone] = useState<Set<string>>(() => new Set(initial.done || []));
+  // clave -> cantidad con la que se marcó completado
+  const [doneMap, setDoneMap] = useState<Map<string, number>>(
+    () => new Map(Object.entries(initial.done || {}))
+  );
 
   const refetch = useCallback(async () => {
     try {
@@ -94,7 +95,9 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
       const d = await r.json();
       setOrders(d.orders);
       setWin(d.window);
-      if (Array.isArray(d.kitchenDone)) setDone(new Set<string>(d.kitchenDone));
+      if (d.kitchenDone && typeof d.kitchenDone === "object") {
+        setDoneMap(new Map(Object.entries(d.kitchenDone as Record<string, number>)));
+      }
     } catch {
       /* silencioso */
     }
@@ -105,24 +108,36 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
     return () => clearInterval(id);
   }, [refetch]);
 
+  // Un ítem está completado sólo mientras la cantidad completada cubra la actual.
+  // Si entran pedidos nuevos que la aumentan, se reabre solo (trazabilidad).
+  const isDone = useCallback(
+    (key: string, qty: number) => {
+      const dq = doneMap.get(key);
+      return dq !== undefined && qty <= dq;
+    },
+    [doneMap]
+  );
+
   const toggle = useCallback(
-    async (key: string, next: boolean) => {
-      // Optimista: reflejar el cambio de inmediato.
-      setDone((prev) => {
-        const s = new Set(prev);
-        if (next) s.add(key);
-        else s.delete(key);
-        return s;
+    async (key: string, qty: number, next: boolean) => {
+      // Optimista
+      setDoneMap((prev) => {
+        const m = new Map(prev);
+        if (next) m.set(key, qty);
+        else m.delete(key);
+        return m;
       });
       try {
         const r = await fetch("/api/kitchen", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ windowId: win.id, key, done: next }),
+          body: JSON.stringify({ windowId: win.id, key, done: next, qty }),
         });
         if (r.ok) {
           const d = await r.json();
-          if (Array.isArray(d.done)) setDone(new Set<string>(d.done));
+          if (d.done && typeof d.done === "object") {
+            setDoneMap(new Map(Object.entries(d.done as Record<string, number>)));
+          }
         } else {
           refetch(); // revertir al estado del servidor
         }
@@ -135,8 +150,11 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
 
   const windowOrders = useMemo(() => orders.filter((o) => o.windowId === win.id), [orders, win.id]);
   const agg = useMemo(() => aggregate(windowOrders, onlyPaid), [windowOrders, onlyPaid]);
-  const dishProg = progress(agg.dishes, "dish", done);
-  const marketProg = progress(agg.market, "market", done);
+
+  const countDone = (rows: [string, number][], kind: Kind) =>
+    rows.reduce((n, [name, qty]) => n + (isDone(itemKey(kind, name), qty) ? 1 : 0), 0);
+  const dishDone = countDone(agg.dishes, "dish");
+  const marketDone = countDone(agg.market, "market");
 
   return (
     <>
@@ -170,27 +188,28 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
 
       <div className="klabel" style={{ marginTop: 6 }}>
         Platos listos — a producir
-        {dishProg.total > 0 && (
-          <span className={`kprog${dishProg.listos === dishProg.total ? " all" : ""}`}>
-            {dishProg.listos}/{dishProg.total} listos
+        {agg.dishes.length > 0 && (
+          <span className={`kprog${dishDone === agg.dishes.length ? " all" : ""}`}>
+            {dishDone}/{agg.dishes.length} listos
           </span>
         )}
       </div>
-      <Bars rows={agg.dishes} kind="dish" done={done} onToggle={toggle} />
+      <Bars rows={agg.dishes} kind="dish" isDone={isDone} onToggle={toggle} />
 
       <div className="klabel">
         Sano Market — a preparar
-        {marketProg.total > 0 && (
-          <span className={`kprog${marketProg.listos === marketProg.total ? " all" : ""}`}>
-            {marketProg.listos}/{marketProg.total} listos
+        {agg.market.length > 0 && (
+          <span className={`kprog${marketDone === agg.market.length ? " all" : ""}`}>
+            {marketDone}/{agg.market.length} listos
           </span>
         )}
       </div>
-      <Bars rows={agg.market} kind="market" done={done} onToggle={toggle} />
+      <Bars rows={agg.market} kind="market" isDone={isDone} onToggle={toggle} />
 
       <p className="wa-note" style={{ textAlign: "left", marginTop: 12 }}>
         Marcá cada ítem como <b>completado</b> a medida que lo producís — el check se comparte con las otras
-        pantallas de cocina y se sincroniza en tiempo real (cada 12 s).
+        pantallas de cocina (cada 12 s). Si entra un pedido que aumenta la cantidad de un ítem ya
+        completado, se reabre solo para no perder de vista lo que falta.
       </p>
     </>
   );
