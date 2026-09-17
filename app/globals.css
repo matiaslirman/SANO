@@ -75,31 +75,47 @@ img,svg{max-width:100%}
 .trust .ig{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--crema)}
 .trust .sep{width:4px;height:4px;border-radius:50%;background:rgba(255,241,180,.5)}
 
-/* ============ COUNTER (sello) ============ */
-.counter{position:relative;background:
-    radial-gradient(130% 130% at 50% 0%, rgba(255,241,180,.08), transparent 60%),
-    var(--bordo-darker);
-  border:1px solid rgba(255,241,180,.4);border-radius:20px;padding:22px 22px 20px;box-shadow:var(--shadow)}
-.counter::before{content:"";position:absolute;inset:7px;border:1px dashed rgba(255,241,180,.32);border-radius:14px;pointer-events:none}
-.clabel{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--crema-soft);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
-.live{display:inline-flex;align-items:center;gap:6px;color:var(--crema)}
-.live .pulse{width:7px;height:7px;border-radius:50%;background:var(--crema);box-shadow:0 0 0 0 rgba(255,241,180,.6);animation:pulse 2.4s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,241,180,.55)}70%{box-shadow:0 0 0 9px rgba(255,241,180,0)}100%{box-shadow:0 0 0 0 rgba(255,241,180,0)}}
-.clock{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
-.clock .u{background:rgba(0,0,0,.28);border:1px solid rgba(255,241,180,.16);border-radius:11px;padding:11px 4px 8px;text-align:center}
-.clock .n{font-family:var(--disp);font-weight:600;font-size:clamp(1.7rem,5vw,2.15rem);color:var(--crema);line-height:1}
-.clock .k{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--crema-soft);margin-top:5px}
-.clock-mini{display:none;font-family:var(--disp);font-weight:600;color:var(--crema);font-size:2.15rem;letter-spacing:.03em;line-height:1;margin-top:11px}
-.cdiv{height:1px;background:rgba(255,241,180,.2);margin:16px 0 14px}
-.cupos-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-.cupos-row .lab{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--crema-soft)}
-.cupos-big{font-family:var(--disp);color:var(--crema);font-weight:600;font-size:1.15rem;margin-top:3px}
-.cupos-big b{color:#fff}
-.cupos-chip{font-family:var(--disp);font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,241,180,.45);color:var(--crema);white-space:nowrap}
-.cupos-chip.low{background:var(--crema);color:var(--bordo-ink);border-color:var(--crema)}
-.track{margin-top:12px;height:7px;border-radius:999px;background:rgba(0,0,0,.3);overflow:hidden;border:1px solid rgba(255,241,180,.14)}
-.track > i{display:block;height:100%;background:linear-gradient(90deg,#FFF1B4,#E9CF76);border-radius:999px;transition:width .4s}
-.delivery{margin-top:13px;font-size:12.5px;color:var(--crema-soft);display:flex;align-items:center;gap:8px}
+/* ============ HERO · sello de marca + pill de urgencia ============ */
+/* acento de color según la fase del countdown (lo aplica la clase is-* del hero / pill) */
+.is-live{--accent:#FFF1B4;--accent-2:#E9CF76}
+.is-urgent{--accent:#FFC24D;--accent-2:#E9922E}
+.is-critical{--accent:#FF9F6B;--accent-2:#F2703F}
+.is-closed{--accent:#E7D7B4;--accent-2:#C9B892}
+
+/* columna derecha del hero: sello oficial (lib/brand · Seal) */
+.hero-visual{display:grid;place-items:center;min-height:230px}
+.hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
+@keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
+
+.hero-urgency{margin-top:20px}
+
+/* ---- PILL (compartido: anclado en el hero + flotante al scrollear) ---- */
+.pill{display:inline-flex;align-items:center;gap:12px;padding:10px 16px;border-radius:999px;
+  background:linear-gradient(180deg,var(--bordo-deep),var(--bordo-darker));
+  border:1px solid rgba(255,241,180,.42);color:var(--crema);box-shadow:0 16px 30px -18px rgba(0,0,0,.7);max-width:100%}
+.pill .pulse{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:0 0 auto;box-shadow:0 0 0 0 rgba(255,241,180,.6);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,241,180,.55)}70%{box-shadow:0 0 0 10px rgba(255,241,180,0)}100%{box-shadow:0 0 0 0 rgba(255,241,180,0)}}
+.is-critical .pill .pulse{animation-duration:1.05s}
+.is-closed .pill .pulse{animation:none;opacity:.5}
+.pill-blk{display:flex;flex-direction:column;line-height:1;text-align:left}
+.pill-lab{font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--crema-soft);white-space:nowrap}
+.pill-val{font-family:var(--disp);font-weight:600;font-size:1.08rem;margin-top:3px;letter-spacing:.02em;color:var(--accent)}
+.pill-sep{width:1px;height:26px;background:rgba(255,241,180,.25);flex:0 0 auto}
+.pill-cupos{font-family:var(--disp);font-size:.95rem;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap;color:var(--crema)}
+.pill-cupos b{color:#fff;font-size:1.12rem}
+.pill-date{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--crema-soft);white-space:nowrap}
+.pill-date svg{opacity:.85}
+
+/* ---- pill flotante: aparece y sigue al usuario ---- */
+.u-pill{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);left:50%;z-index:55;
+  transform:translate(-50%,-160%);opacity:0;pointer-events:none;
+  padding:0;border:0;background:transparent;cursor:pointer;font:inherit;
+  transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .24s;max-width:calc(100vw - 24px)}
+.u-pill.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.u-pill .pill-date,.u-pill .pill-date-sep{display:none}
+
+/* accesibilidad: texto solo para lectores de pantalla */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* ============ SHEET / MENU ============ */
 .sheet{background:var(--crema-bg);color:var(--ink);border-radius:26px 26px 0 0;position:relative;z-index:1}
@@ -235,6 +251,7 @@ footer .fbrand{margin-bottom:12px}
 /* ============ RESPONSIVE ============ */
 @media(max-width:900px){
   .hero .wrap{grid-template-columns:1fr;gap:20px;padding-block:24px 20px}
+  .hero-visual{display:none}          /* el sello es solo para desktop */
   .checkout{grid-template-columns:1fr}
   .mgrid{grid-template-columns:repeat(2,1fr)}
   footer .wrap{grid-template-columns:1fr 1fr}
@@ -252,15 +269,12 @@ footer .fbrand{margin-bottom:12px}
   .combos-lead{font-size:12.5px;width:100%}
   .combos-cells{min-width:0}
   .combo-cell .cc-q{font-size:1.35rem}
-  .counter{padding:14px 15px 13px;border-radius:16px}
-  .counter::before{inset:6px;border-radius:11px}
-  .clabel{font-size:9.5px}
-  .clock{display:none}
-  .clock-mini{display:block;font-size:1.95rem}
-  .cdiv{margin:11px 0 10px}
-  .cupos-big{font-size:1.02rem}
-  .cupos-chip{font-size:12px;padding:5px 10px}
-  .delivery{margin-top:10px;font-size:12px}
+  /* pill: en móvil ocupa el ancho y oculta la fecha para ir compacto */
+  .hero-urgency{margin-top:14px}
+  .hero-urgency .pill{width:100%}
+  .hero-urgency .pill-cupos{margin-left:auto}
+  .pill-date,.pill-date-sep{display:none}
+  .u-pill{top:calc(env(safe-area-inset-top,0px) + 62px)}
   .menu-grid{grid-template-columns:1fr}
   .mgrid{grid-template-columns:1fr 1fr}
   .sec-head{align-items:flex-start}
