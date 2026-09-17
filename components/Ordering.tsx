@@ -196,6 +196,7 @@ export function Ordering({
     L.push("");
     L.push(`*Orden ${order.id}* · ${order.customerName}`);
     L.push(order.windowLabel); // ej. "Entrega Viernes 18 sep"
+    L.push("📍 Retiro en el local (pick-up). Si necesito envío, lo coordino por mi cuenta.");
 
     if (order.dishes.length) {
       L.push("");

@@ -8,6 +8,9 @@ interface Win {
   label: string;
 }
 
+type Kind = "dish" | "market";
+const itemKey = (kind: Kind, name: string) => `${kind}:${name}`;
+
 function aggregate(orders: Order[], onlyPaid: boolean) {
   const dishes: Record<string, number> = {};
   const market: Record<string, number> = {};
@@ -28,30 +31,62 @@ function aggregate(orders: Order[], onlyPaid: boolean) {
   return { dishes: sort(dishes), market: sort(market), dishTotal, marketTotal };
 }
 
-function Bars({ rows }: { rows: [string, number][] }) {
+function Bars({
+  rows,
+  kind,
+  isDone,
+  onToggle,
+}: {
+  rows: [string, number][];
+  kind: Kind;
+  isDone: (key: string, qty: number) => boolean;
+  onToggle: (key: string, qty: number, next: boolean) => void;
+}) {
   const max = rows.length ? rows[0][1] : 1;
   if (rows.length === 0) return <div className="empty" style={{ padding: 16 }}>Sin ítems todavía.</div>;
   return (
     <div className="kgrid">
-      {rows.map(([name, qty]) => (
-        <div className="krow" key={name}>
-          <span className="kqty tnum">{qty}×</span>
-          <div style={{ flex: 1 }}>
-            <div className="kname">{name}</div>
+      {rows.map(([name, qty]) => {
+        const key = itemKey(kind, name);
+        const done = isDone(key, qty);
+        return (
+          <div className={`krow${done ? " done" : ""}`} key={key}>
+            <button
+              type="button"
+              className="kcheck"
+              aria-pressed={done}
+              aria-label={done ? `Reabrir ${name}` : `Completar ${name}`}
+              title={done ? "Reabrir" : "Marcar completado"}
+              onClick={() => onToggle(key, qty, !done)}
+            >
+              {done ? "✓" : ""}
+            </button>
+            <span className="kqty tnum">{qty}×</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="kname">{name}</div>
+            </div>
+            <div className="kbar">
+              <i style={{ width: `${Math.round((qty / max) * 100)}%` }} />
+            </div>
           </div>
-          <div className="kbar">
-            <i style={{ width: `${Math.round((qty / max) * 100)}%` }} />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-export function KitchenView({ initial }: { initial: { orders: Order[]; window: Win } }) {
+export function KitchenView({
+  initial,
+}: {
+  initial: { orders: Order[]; window: Win; done: Record<string, number> };
+}) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const [win, setWin] = useState<Win>(initial.window);
   const [onlyPaid, setOnlyPaid] = useState(false);
+  // clave -> cantidad con la que se marcó completado
+  const [doneMap, setDoneMap] = useState<Map<string, number>>(
+    () => new Map(Object.entries(initial.done || {}))
+  );
 
   const refetch = useCallback(async () => {
     try {
@@ -60,6 +95,9 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
       const d = await r.json();
       setOrders(d.orders);
       setWin(d.window);
+      if (d.kitchenDone && typeof d.kitchenDone === "object") {
+        setDoneMap(new Map(Object.entries(d.kitchenDone as Record<string, number>)));
+      }
     } catch {
       /* silencioso */
     }
@@ -70,8 +108,53 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
     return () => clearInterval(id);
   }, [refetch]);
 
+  // Un ítem está completado sólo mientras la cantidad completada cubra la actual.
+  // Si entran pedidos nuevos que la aumentan, se reabre solo (trazabilidad).
+  const isDone = useCallback(
+    (key: string, qty: number) => {
+      const dq = doneMap.get(key);
+      return dq !== undefined && qty <= dq;
+    },
+    [doneMap]
+  );
+
+  const toggle = useCallback(
+    async (key: string, qty: number, next: boolean) => {
+      // Optimista
+      setDoneMap((prev) => {
+        const m = new Map(prev);
+        if (next) m.set(key, qty);
+        else m.delete(key);
+        return m;
+      });
+      try {
+        const r = await fetch("/api/kitchen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ windowId: win.id, key, done: next, qty }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.done && typeof d.done === "object") {
+            setDoneMap(new Map(Object.entries(d.done as Record<string, number>)));
+          }
+        } else {
+          refetch(); // revertir al estado del servidor
+        }
+      } catch {
+        refetch();
+      }
+    },
+    [win.id, refetch]
+  );
+
   const windowOrders = useMemo(() => orders.filter((o) => o.windowId === win.id), [orders, win.id]);
   const agg = useMemo(() => aggregate(windowOrders, onlyPaid), [windowOrders, onlyPaid]);
+
+  const countDone = (rows: [string, number][], kind: Kind) =>
+    rows.reduce((n, [name, qty]) => n + (isDone(itemKey(kind, name), qty) ? 1 : 0), 0);
+  const dishDone = countDone(agg.dishes, "dish");
+  const marketDone = countDone(agg.market, "market");
 
   return (
     <>
@@ -103,15 +186,30 @@ export function KitchenView({ initial }: { initial: { orders: Order[]; window: W
         </button>
       </div>
 
-      <div className="klabel" style={{ marginTop: 6 }}>Platos listos — a producir</div>
-      <Bars rows={agg.dishes} />
+      <div className="klabel" style={{ marginTop: 6 }}>
+        Platos listos — a producir
+        {agg.dishes.length > 0 && (
+          <span className={`kprog${dishDone === agg.dishes.length ? " all" : ""}`}>
+            {dishDone}/{agg.dishes.length} listos
+          </span>
+        )}
+      </div>
+      <Bars rows={agg.dishes} kind="dish" isDone={isDone} onToggle={toggle} />
 
-      <div className="klabel">Sano Market — a preparar</div>
-      <Bars rows={agg.market} />
+      <div className="klabel">
+        Sano Market — a preparar
+        {agg.market.length > 0 && (
+          <span className={`kprog${marketDone === agg.market.length ? " all" : ""}`}>
+            {marketDone}/{agg.market.length} listos
+          </span>
+        )}
+      </div>
+      <Bars rows={agg.market} kind="market" isDone={isDone} onToggle={toggle} />
 
       <p className="wa-note" style={{ textAlign: "left", marginTop: 12 }}>
-        Se consolida en tiempo real (cada 12 s) a medida que entran pedidos — base para compras de insumos y
-        planificación de cocina.
+        Marcá cada ítem como <b>completado</b> a medida que lo producís — el check se comparte con las otras
+        pantallas de cocina (cada 12 s). Si entra un pedido que aumenta la cantidad de un ítem ya
+        completado, se reabre solo para no perder de vista lo que falta.
       </p>
     </>
   );

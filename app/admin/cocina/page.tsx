@@ -8,9 +8,10 @@ export const dynamic = "force-dynamic";
 export default async function CocinaPage() {
   const orders = await store.listOrders();
   const win = getNextWindow();
+  const done = await store.getKitchenDone(win.id);
   return (
     <AdminShell active="cocina" title="Resumen de cocina">
-      <KitchenView initial={{ orders, window: { id: win.id, label: win.shortLabel } }} />
+      <KitchenView initial={{ orders, window: { id: win.id, label: win.shortLabel }, done }} />
     </AdminShell>
   );
 }

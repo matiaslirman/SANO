@@ -38,6 +38,10 @@ export function SiteFooter() {
             <br />
             8:00 a.m. – 12:00 md
           </p>
+          <p style={{ marginTop: 10 }}>
+            <b style={{ color: "var(--crema)" }}>Solo retiro en el local.</b> No hacemos delivery — si
+            necesitás envío, lo coordinás por tu cuenta.
+          </p>
         </div>
         <div>
           <h4>Contacto</h4>
