@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { PublicStatus, MarketCategory, Order } from "@/lib/types";
 import { priceForDishes, comboLabel, nextCombo, savingsVsBase } from "@/lib/pricing";
 import { crc } from "@/lib/format";
+import { Seal } from "@/lib/brand";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -29,30 +30,47 @@ export function Ordering({
   const [toast, setToast] = useState("");
 
   // ── countdown (solo tras montar, para evitar mismatch de hidratación) ──
-  const [cd, setCd] = useState({ d: "—", h: "--", m: "--", s: "--", mini: "—" });
+  const [cd, setCd] = useState({
+    d: 0, h: 0, m: 0, s: 0,
+    dd: "—", hh: "--", mm: "--", ss: "--",
+    totalMin: Number.POSITIVE_INFINITY, closed: false,
+  });
   useEffect(() => {
     const target = new Date(status.window.cutoffISO).getTime();
+    const p = (n: number) => String(n).padStart(2, "0");
     const tick = () => {
-      let ms = target - Date.now();
-      if (ms < 0) ms = 0;
+      const raw = target - Date.now();
+      const ms = Math.max(0, raw);
       const t = Math.floor(ms / 1000);
       const d = Math.floor(t / 86400);
       const h = Math.floor((t % 86400) / 3600);
       const m = Math.floor((t % 3600) / 60);
       const s = t % 60;
-      const p = (n: number) => String(n).padStart(2, "0");
       setCd({
-        d: String(d),
-        h: p(h),
-        m: p(m),
-        s: p(s),
-        mini: (d > 0 ? d + "d " : "") + p(h) + ":" + p(m) + ":" + p(s),
+        d, h, m, s,
+        dd: String(d), hh: p(h), mm: p(m), ss: p(s),
+        totalMin: Math.floor(ms / 60000),
+        closed: raw <= 0,
       });
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [status.window.cutoffISO]);
+
+  // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
+  const heroPillRef = useRef<HTMLDivElement>(null);
+  const [pillShow, setPillShow] = useState(false);
+  useEffect(() => {
+    const el = heroPillRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => setPillShow(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-76px 0px 0px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   // ── refrescar estado (cupos/ventana) periódicamente ──
   const refetchStatus = useCallback(async () => {
@@ -128,6 +146,45 @@ export function Ordering({
   const cuposPct = status.cuposTotales
     ? Math.round((status.cuposDisponibles / status.cuposTotales) * 100)
     : 0;
+
+  // ── fase de urgencia del countdown ──
+  const closed = cd.closed;
+  const critical = !closed && cd.totalMin <= 20;
+  const urgent = !closed && !critical && cd.totalMin <= 120;
+  const phaseClass = closed ? "is-closed" : critical ? "is-critical" : urgent ? "is-urgent" : "is-live";
+  const phaseLabel = closed ? "Pedidos" : critical ? "Cerrando ya" : urgent ? "Cierra pronto" : "Cierra en";
+  const cdTime = closed ? "Cerrado" : `${cd.d > 0 ? cd.dd + "d " : ""}${cd.hh}:${cd.mm}:${cd.ss}`;
+  const cuposText = soldOut
+    ? "Sin cupos"
+    : `${status.cuposDisponibles} ${status.cuposDisponibles === 1 ? "cupo" : "cupos"}`;
+  const cdA11y = closed
+    ? "El cierre de pedidos de esta ventana ya pasó."
+    : `Los pedidos cierran en ${cd.d > 0 ? `${cd.d} días, ` : ""}${cd.h} horas y ${cd.m} minutos. Quedan ${cuposText}.`;
+
+  // Pill de urgencia reutilizable (anclado en el hero + flotante al scrollear).
+  // Función que devuelve JSX (no un componente) para no remontar y reiniciar el pulso en cada tick.
+  const renderPill = (withDate: boolean) => (
+    <span className="pill">
+      <span className="pulse" aria-hidden="true" />
+      <span className="pill-blk">
+        <span className="pill-lab">{phaseLabel}</span>
+        <span className="pill-val tnum">{cdTime}</span>
+      </span>
+      <span className="pill-sep" />
+      <span className="pill-cupos">
+        {soldOut ? "Sin cupos" : <><b>{status.cuposDisponibles}</b> {status.cuposDisponibles === 1 ? "cupo" : "cupos"}</>}
+      </span>
+      {withDate && (
+        <>
+          <span className="pill-sep pill-date-sep" />
+          <span className="pill-date">
+            {IconCal}
+            <span>{status.window.deliveryDateLabel} · 8 a.m.–12 md</span>
+          </span>
+        </>
+      )}
+    </span>
+  );
 
   const scrollToMenu = () => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
   const scrollToCheckout = () =>
@@ -234,7 +291,7 @@ export function Ordering({
   return (
     <>
       {/* ============ HERO ============ */}
-      <section className="hero">
+      <section className={`hero ${phaseClass}`}>
         <div className="wrap">
           <div className="hero-copy">
             <h1>
@@ -263,44 +320,17 @@ export function Ordering({
               <span className="sep trust-extra" />
               <span className="trust-extra">Atención personalizada 1 a 1</span>
             </div>
+
+            {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
+            <div className="hero-urgency" ref={heroPillRef}>
+              {renderPill(true)}
+              <span className="sr-only" role="timer">{cdA11y}</span>
+            </div>
           </div>
 
-          {/* COUNTER */}
-          <div className="counter" aria-label="Cierre de pedidos y cupos">
-            <div className="clabel">
-              <span>Cierre de pedidos</span>
-              <span className="live">
-                <span className="pulse" /> En vivo
-              </span>
-            </div>
-            <div className="clock">
-              <div className="u"><div className="n tnum">{cd.d}</div><div className="k">Días</div></div>
-              <div className="u"><div className="n tnum">{cd.h}</div><div className="k">Horas</div></div>
-              <div className="u"><div className="n tnum">{cd.m}</div><div className="k">Min</div></div>
-              <div className="u"><div className="n tnum">{cd.s}</div><div className="k">Seg</div></div>
-            </div>
-            <div className="clock-mini tnum" aria-hidden="true">{cd.mini}</div>
-            <div className="cdiv" />
-            <div className="cupos-row">
-              <div>
-                <div className="lab">Cupos de la ventana</div>
-                <div className="cupos-big">
-                  Quedan <b>{status.cuposDisponibles}</b> de {status.cuposTotales}
-                </div>
-              </div>
-              <div className={`cupos-chip${status.cuposDisponibles <= 4 && !soldOut ? " low" : ""}`}>
-                {soldOut ? "Sin cupos" : status.cuposDisponibles <= 4 ? "Últimos cupos" : "Cupos abiertos"}
-              </div>
-            </div>
-            <div className="track">
-              <i style={{ width: `${Math.max(0, Math.min(100, cuposPct))}%` }} />
-            </div>
-            <div className="delivery">
-              {IconCal}
-              <span>
-                {status.window.deliveryDateLabel} · 8:00 a.m. – 12:00 md
-              </span>
-            </div>
+          {/* SELLO — recurso de marca oficial (lib/brand · Seal) */}
+          <div className="hero-visual" aria-hidden="true">
+            <Seal className="hero-seal" />
           </div>
         </div>
       </section>
@@ -542,6 +572,18 @@ export function Ordering({
           </div>
         </div>
       </div>
+
+      {/* PILL de urgencia flotante — aparece cuando el pill del hero sale de vista */}
+      <button
+        type="button"
+        className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
+        onClick={scrollToMenu}
+        aria-hidden={pillShow && !created ? undefined : true}
+        tabIndex={pillShow && !created ? 0 : -1}
+        aria-label={`${cdA11y} Tocá para ir al menú.`}
+      >
+        {renderPill(false)}
+      </button>
 
       {/* sticky total */}
       <div className={`sticky${totals.grand > 0 && !created ? " show" : ""}`}>
