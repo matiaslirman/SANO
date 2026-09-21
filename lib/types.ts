@@ -20,6 +20,7 @@ export interface Settings {
   cuposTotales: number;    // capacity per delivery window
   basePrice: number;       // CRC per dish (no combo)
   combos: ComboTier[];     // volume combo tiers
+  menuPublishedAt?: string; // ISO: cuándo se publicó el menú → ancla del ciclo de entregas
 }
 
 export type OrderStatus = "pendiente" | "pagado";

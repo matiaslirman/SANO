@@ -5,7 +5,7 @@ import os from "node:os";
 import { Redis } from "@upstash/redis";
 import type { Settings, MarketCategory, Order, OrderStatus } from "./types";
 import { DEFAULT_SETTINGS, DEFAULT_MARKET } from "./defaults";
-import { getNextWindow, getOfferedWindows, windowFromId } from "./windows";
+import { getNextWindow, getClientWindows, windowFromId } from "./windows";
 import { priceForDishes } from "./pricing";
 
 const K = {
@@ -154,8 +154,9 @@ export const store = {
   async createOrder(input: NewOrderInput): Promise<Order> {
     const settings = await this.getSettings();
     const market = await this.getMarket();
-    // Ventana elegida por el cliente si es una de las ofrecidas; si no, la más cercana.
-    const offered = getOfferedWindows();
+    // Ventana del ciclo actual (atado al menú). Respeta la elegida por el cliente
+    // si sigue abierta; si no (ej. pedido tardío), cae en la del ciclo actual.
+    const offered = getClientWindows(settings.menuPublishedAt);
     const win = offered.find((w) => w.id === input.windowId) || offered[0] || getNextWindow();
 
     // Dishes: only keep known menu items with qty > 0

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { store, type NewOrderInput } from "@/lib/store";
 import { isAdmin } from "@/lib/auth-server";
-import { getNextWindow } from "@/lib/windows";
+import { getCycleWindows, getNextWindow } from "@/lib/windows";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,10 @@ export async function GET() {
   }
   const orders = await store.listOrders();
   const cupos = await store.computeCupos();
-  const win = getNextWindow();
+  const settings = await store.getSettings();
+  // Ventana "activa" = la más cercana del ciclo actual (atado al menú).
+  const cycle = getCycleWindows(settings.menuPublishedAt);
+  const win = cycle[0] || getNextWindow();
   const kitchenDone = await store.getKitchenDone(win.id);
   return NextResponse.json(
     { orders, cupos, window: { id: win.id, label: win.shortLabel }, kitchenDone },

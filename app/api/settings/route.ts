@@ -25,6 +25,8 @@ export async function PATCH(req: Request) {
   const patch: Partial<Settings> = {};
   if (Array.isArray(body.menu)) {
     patch.menu = body.menu.map((s) => String(s).slice(0, 120).trim()).filter(Boolean);
+    // Guardar el menú = abrir una nueva semana: se fija el ciclo de entregas (viernes + lunes).
+    patch.menuPublishedAt = new Date().toISOString();
   }
   if (typeof body.weekLabel === "string") patch.weekLabel = body.weekLabel.slice(0, 120).trim();
   if (typeof body.cuposTotales === "number" && body.cuposTotales >= 0) {

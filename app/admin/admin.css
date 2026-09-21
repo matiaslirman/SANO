@@ -27,6 +27,8 @@
 .wtab.on{background:var(--bordo);color:var(--crema);border-color:var(--bordo)}
 .wtab-dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
 .wtab.on .wtab-dot{background:var(--crema)}
+.wtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;line-height:1}
+.wtab.on .wtab-badge{background:#fff;color:var(--bordo)}
 
 /* aviso de pedidos de ventanas anteriores sin completar */
 .walert{margin-top:16px;background:#FBF1DE;border:1px solid #EFDCB4;color:#7a4d0a;border-radius:12px;padding:12px 15px;font-size:13.5px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}

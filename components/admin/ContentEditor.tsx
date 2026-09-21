@@ -98,7 +98,10 @@ export function ContentEditor({
       {/* MENÚ */}
       <div className="editcard">
         <h3>Menú de la semana</h3>
-        <div className="sub">Editá los platos como una lista. Se reflejan al instante en el sitio del cliente.</div>
+        <div className="sub">
+          Editá los platos de la semana. <b>Al guardar se abre una nueva semana de entregas</b> (viernes + lunes):
+          los pedidos nuevos entran a ese ciclo y las entregas anteriores pasan al Histórico de Pedidos.
+        </div>
         <div className="field" style={{ marginTop: 0, marginBottom: 14 }}>
           <label>Etiqueta de la semana</label>
           <input value={weekLabel} onChange={(e) => setWeekLabel(e.target.value)} placeholder="Ej: Semana del 15 al 21 sep" />
@@ -122,7 +125,7 @@ export function ContentEditor({
         </button>
         <div>
           <button className="save-btn" onClick={saveMenu} disabled={busyMenu}>
-            {busyMenu ? "Guardando…" : "Guardar menú"}
+            {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
           </button>
           <Saved show={savedMenu} />
         </div>

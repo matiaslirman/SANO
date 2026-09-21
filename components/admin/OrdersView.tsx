@@ -3,18 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
-import { WindowTabs, deriveWindows, pastPendingOrders, type WinOpt } from "./WindowTabs";
+import type { WinOpt } from "./WindowTabs";
 
-interface Cupos {
-  totales: number;
-  disponibles: number;
-  confirmados: number;
-}
 interface Data {
   orders: Order[];
-  cupos: Cupos;
-  window: WinOpt;
-  deliveryWindows: WinOpt[]; // entregas ofrecidas para mover un pedido
+  cuposTotales: number;
+  cycleWindows: WinOpt[];   // entregas del ciclo actual (viernes + lunes)
+  deliveryWindows: WinOpt[]; // rango de viernes/lunes para reasignar un pedido
 }
 
 const shortWinLabel = (label: string) => label.replace(/^Entrega\s+/i, "");
@@ -35,24 +30,22 @@ function itemsSummary(o: Order): string {
 
 export function OrdersView({ initial }: { initial: Data }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
-  const [cupos, setCupos] = useState<Cupos>(initial.cupos);
-  const [activeWin, setActiveWin] = useState<WinOpt>(initial.window);
-  const [selWin, setSelWin] = useState<string>(initial.window.id);
   const [busyId, setBusyId] = useState<string>("");
+  const [selTab, setSelTab] = useState<string>(initial.cycleWindows[0]?.id || "hist");
+
+  const cuposTotales = initial.cuposTotales;
+  const cycleIds = useMemo(() => new Set(initial.cycleWindows.map((w) => w.id)), [initial.cycleWindows]);
 
   const refetch = useCallback(async () => {
     try {
       const r = await fetch("/api/orders", { cache: "no-store" });
       if (!r.ok) return;
-      const d: Data = await r.json();
-      setOrders(d.orders);
-      setCupos(d.cupos);
-      setActiveWin(d.window);
+      const d = await r.json();
+      if (Array.isArray(d.orders)) setOrders(d.orders);
     } catch {
       /* silencioso */
     }
   }, []);
-
   useEffect(() => {
     const id = setInterval(refetch, 15000);
     return () => clearInterval(id);
@@ -67,10 +60,7 @@ export function OrdersView({ initial }: { initial: Data }) {
         body: JSON.stringify(patch),
       });
       const d = await r.json();
-      if (r.ok) {
-        setOrders((prev) => prev.map((x) => (x.id === o.id ? d.order : x)));
-        setCupos(d.cupos);
-      }
+      if (r.ok) setOrders((prev) => prev.map((x) => (x.id === o.id ? d.order : x)));
     } finally {
       setBusyId("");
     }
@@ -78,6 +68,23 @@ export function OrdersView({ initial }: { initial: Data }) {
   const togglePaid = (o: Order) =>
     patchOrder(o, { status: o.status === "pagado" ? "pendiente" : "pagado" });
   const toggleCompleted = (o: Order) => patchOrder(o, { completed: !o.completed });
+
+  async function changeWindow(o: Order, windowId: string) {
+    if (windowId === o.windowId) return;
+    setBusyId(o.id);
+    try {
+      const r = await fetch(`/api/orders/${o.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ window: windowId }),
+      });
+      const d = await r.json();
+      if (r.ok) refetch();
+      else alert(d.error || "No se pudo cambiar la entrega.");
+    } finally {
+      setBusyId("");
+    }
+  }
 
   async function renumberOrder(o: Order) {
     const input = window.prompt(
@@ -106,31 +113,6 @@ export function OrdersView({ initial }: { initial: Data }) {
     }
   }
 
-  async function changeWindow(o: Order, windowId: string) {
-    if (windowId === o.windowId) return;
-    setBusyId(o.id);
-    try {
-      const r = await fetch(`/api/orders/${o.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ window: windowId }),
-      });
-      const d = await r.json();
-      if (r.ok) refetch();
-      else alert(d.error || "No se pudo cambiar la entrega.");
-    } finally {
-      setBusyId("");
-    }
-  }
-
-  // Opciones de entrega para un pedido: las ofrecidas + la ventana actual del pedido.
-  const winOptionsFor = (o: Order): WinOpt[] => {
-    const m = new Map<string, string>();
-    m.set(o.windowId, o.windowLabel);
-    for (const w of initial.deliveryWindows) m.set(w.id, w.label);
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([id, label]) => ({ id, label }));
-  };
-
   async function removeOrder(o: Order) {
     if (!confirm(`¿Eliminar el pedido ${o.id} de ${o.customerName}?\nEsta acción no se puede deshacer.`)) return;
     setBusyId(o.id);
@@ -145,44 +127,66 @@ export function OrdersView({ initial }: { initial: Data }) {
     }
   }
 
-  const windows = useMemo(() => deriveWindows(orders, activeWin), [orders, activeWin]);
-  const selLabel = selWin === "all" ? "Todas las ventanas" : windows.find((w) => w.id === selWin)?.label || activeWin.label;
+  // Opciones de entrega para un pedido: el rango de viernes/lunes + su ventana actual.
+  const winOptionsFor = (o: Order): WinOpt[] => {
+    const m = new Map<string, string>();
+    m.set(o.windowId, o.windowLabel);
+    for (const w of initial.deliveryWindows) m.set(w.id, w.label);
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([id, label]) => ({ id, label }));
+  };
 
+  const isHist = selTab === "hist";
   const scoped = useMemo(
-    () => (selWin === "all" ? orders : orders.filter((o) => o.windowId === selWin)),
-    [orders, selWin]
+    () => (isHist ? orders.filter((o) => !cycleIds.has(o.windowId)) : orders.filter((o) => o.windowId === selTab)),
+    [orders, isHist, selTab, cycleIds]
   );
-
-  const pending = useMemo(() => pastPendingOrders(orders, activeWin.id), [orders, activeWin.id]);
-  const jumpWin = useMemo(() => pending.reduce((mx, o) => (o.windowId > mx ? o.windowId : mx), ""), [pending]);
+  const histPending = useMemo(
+    () => orders.filter((o) => !cycleIds.has(o.windowId) && !o.completed).length,
+    [orders, cycleIds]
+  );
 
   const stats = useMemo(() => {
     const paid = scoped.filter((o) => o.status === "pagado");
-    const revenue = paid.reduce((s, o) => s + o.total, 0);
-    const disponibles =
-      selWin === "all" ? cupos.disponibles : Math.max(0, cupos.totales - paid.length);
-    return { pedidos: scoped.length, confirmados: paid.length, revenue, disponibles };
-  }, [scoped, selWin, cupos]);
+    return {
+      pedidos: scoped.length,
+      confirmados: paid.length,
+      revenue: paid.reduce((s, o) => s + o.total, 0),
+      disponibles: isHist ? null : Math.max(0, cuposTotales - paid.length),
+    };
+  }, [scoped, isHist, cuposTotales]);
+
+  const tabLabel = isHist ? "Histórico" : shortWinLabel(initial.cycleWindows.find((w) => w.id === selTab)?.label || "");
 
   return (
     <>
-      {pending.length > 0 && selWin !== jumpWin && (
-        <div className="walert">
-          <span>
-            ⚠️ Tenés <b>{pending.length}</b> pedido{pending.length > 1 ? "s" : ""} de entregas anteriores sin
-            completar — no se te pierden.
-          </span>
-          <button className="walert-btn" onClick={() => setSelWin(jumpWin)}>
-            Ver esos pedidos →
+      <div className="wtabs" role="tablist" aria-label="Entrega">
+        {initial.cycleWindows.map((w) => (
+          <button
+            key={w.id}
+            type="button"
+            role="tab"
+            aria-selected={selTab === w.id}
+            className={`wtab${selTab === w.id ? " on" : ""}`}
+            onClick={() => setSelTab(w.id)}
+          >
+            {shortWinLabel(w.label)}
           </button>
-        </div>
-      )}
-
-      <WindowTabs windows={windows} selected={selWin} activeId={activeWin.id} onSelect={setSelWin} includeAll />
+        ))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isHist}
+          className={`wtab${isHist ? " on" : ""}`}
+          onClick={() => setSelTab("hist")}
+        >
+          Histórico
+          {histPending > 0 && <span className="wtab-badge">{histPending}</span>}
+        </button>
+      </div>
 
       <div className="astat">
         <div className="box">
-          <div className="k">Pedidos · {selWin === "all" ? "Todas" : selLabel.replace(/^Entrega\s+/i, "")}</div>
+          <div className="k">Pedidos · {tabLabel}</div>
           <div className="v">{stats.pedidos}</div>
         </div>
         <div className="box">
@@ -191,9 +195,7 @@ export function OrdersView({ initial }: { initial: Data }) {
         </div>
         <div className="box accent">
           <div className="k">Cupos disponibles</div>
-          <div className="v">
-            {stats.disponibles} / {cupos.totales}
-          </div>
+          <div className="v">{stats.disponibles === null ? "—" : `${stats.disponibles} / ${cuposTotales}`}</div>
         </div>
         <div className="box">
           <div className="k">Ingreso confirmado</div>
@@ -204,7 +206,7 @@ export function OrdersView({ initial }: { initial: Data }) {
       {scoped.length === 0 ? (
         <div className="otable">
           <div className="empty" style={{ padding: 20 }}>
-            No hay pedidos en esta ventana.
+            {isHist ? "No hay pedidos en el histórico." : "No hay pedidos en esta entrega."}
           </div>
         </div>
       ) : (
@@ -270,8 +272,9 @@ export function OrdersView({ initial }: { initial: Data }) {
       )}
 
       <p className="wa-note" style={{ textAlign: "left", marginTop: 12 }}>
-        Al marcar un pedido como <b>pagado</b> se descuenta 1 cupo automáticamente del contador que ven los
-        clientes. Se actualiza solo cada 15 s. Tocá el <b>N°</b> de un pedido para ajustarlo a tu numeración real.
+        Ves las entregas del <b>viernes</b> y <b>lunes</b> de esta semana; el resto queda en <b>Histórico</b>. Al
+        marcar <b>pagado</b> se descuenta 1 cupo del contador del cliente. Tocá el <b>N°</b> para ajustar la
+        numeración, o el <b>día de entrega</b> para mover un pedido. Se actualiza solo cada 15 s.
       </p>
     </>
   );

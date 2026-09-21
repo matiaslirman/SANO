@@ -2,7 +2,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Ordering } from "@/components/Ordering";
 import { store } from "@/lib/store";
-import { getOfferedWindows } from "@/lib/windows";
+import { getClientWindows } from "@/lib/windows";
 import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function Home() {
   const market = await store.getMarket();
 
   const windows: WindowInfo[] = await Promise.all(
-    getOfferedWindows().map(async (w): Promise<WindowInfo> => {
+    getClientWindows(settings.menuPublishedAt).map(async (w): Promise<WindowInfo> => {
       const c = await store.computeCuposFor(w.id);
       return {
         id: w.id,

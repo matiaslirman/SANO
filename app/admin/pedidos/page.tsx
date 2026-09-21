@@ -1,15 +1,15 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { OrdersView } from "@/components/admin/OrdersView";
 import { store, isPersistent } from "@/lib/store";
-import { getNextWindow, getOfferedWindows } from "@/lib/windows";
+import { getCycleWindows, getWindowRange } from "@/lib/windows";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidosPage() {
   const orders = await store.listOrders();
-  const cupos = await store.computeCupos();
-  const win = getNextWindow();
-  const deliveryWindows = getOfferedWindows().map((w) => ({ id: w.id, label: w.shortLabel }));
+  const settings = await store.getSettings();
+  const cycleWindows = getCycleWindows(settings.menuPublishedAt).map((w) => ({ id: w.id, label: w.shortLabel }));
+  const deliveryWindows = getWindowRange().map((w) => ({ id: w.id, label: w.shortLabel }));
 
   return (
     <AdminShell active="pedidos" title="Pedidos">
@@ -20,7 +20,7 @@ export default async function PedidosPage() {
         </div>
       )}
       <OrdersView
-        initial={{ orders, cupos, window: { id: win.id, label: win.shortLabel }, deliveryWindows }}
+        initial={{ orders, cuposTotales: settings.cuposTotales, cycleWindows, deliveryWindows }}
       />
     </AdminShell>
   );
