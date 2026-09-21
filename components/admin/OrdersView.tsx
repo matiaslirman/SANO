@@ -14,7 +14,10 @@ interface Data {
   orders: Order[];
   cupos: Cupos;
   window: WinOpt;
+  deliveryWindows: WinOpt[]; // entregas ofrecidas para mover un pedido
 }
+
+const shortWinLabel = (label: string) => label.replace(/^Entrega\s+/i, "");
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("es-CR", {
@@ -102,6 +105,31 @@ export function OrdersView({ initial }: { initial: Data }) {
       setBusyId("");
     }
   }
+
+  async function changeWindow(o: Order, windowId: string) {
+    if (windowId === o.windowId) return;
+    setBusyId(o.id);
+    try {
+      const r = await fetch(`/api/orders/${o.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ window: windowId }),
+      });
+      const d = await r.json();
+      if (r.ok) refetch();
+      else alert(d.error || "No se pudo cambiar la entrega.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  // Opciones de entrega para un pedido: las ofrecidas + la ventana actual del pedido.
+  const winOptionsFor = (o: Order): WinOpt[] => {
+    const m = new Map<string, string>();
+    m.set(o.windowId, o.windowLabel);
+    for (const w of initial.deliveryWindows) m.set(w.id, w.label);
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([id, label]) => ({ id, label }));
+  };
 
   async function removeOrder(o: Order) {
     if (!confirm(`¿Eliminar el pedido ${o.id} de ${o.customerName}?\nEsta acción no se puede deshacer.`)) return;
@@ -202,8 +230,20 @@ export function OrdersView({ initial }: { initial: Data }) {
                 {o.customerName}
                 <small>
                   {o.whatsapp ? o.whatsapp + " · " : ""}
-                  {fmtDate(o.createdAt)} · {o.windowLabel}
+                  {fmtDate(o.createdAt)}
                 </small>
+                <select
+                  className="wsel"
+                  value={o.windowId}
+                  onChange={(e) => changeWindow(o, e.target.value)}
+                  disabled={busyId === o.id}
+                  aria-label={`Día de entrega de ${o.id}`}
+                  title="Cambiar día de entrega"
+                >
+                  {winOptionsFor(o).map((w) => (
+                    <option key={w.id} value={w.id}>{shortWinLabel(w.label)}</option>
+                  ))}
+                </select>
               </span>
               <span className="oitems">
                 {itemsSummary(o)}

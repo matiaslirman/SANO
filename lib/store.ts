@@ -5,7 +5,7 @@ import os from "node:os";
 import { Redis } from "@upstash/redis";
 import type { Settings, MarketCategory, Order, OrderStatus } from "./types";
 import { DEFAULT_SETTINGS, DEFAULT_MARKET } from "./defaults";
-import { getNextWindow } from "./windows";
+import { getNextWindow, getOfferedWindows, windowFromId } from "./windows";
 import { priceForDishes } from "./pricing";
 
 const K = {
@@ -72,6 +72,7 @@ export interface NewOrderInput {
   customerName: string;
   whatsapp?: string;
   notes?: string;
+  windowId?: string; // entrega elegida por el cliente (una de las ofrecidas)
   dishes: { name: string; qty: number }[];
   market: { category: string; name: string; qty: number }[];
 }
@@ -153,7 +154,9 @@ export const store = {
   async createOrder(input: NewOrderInput): Promise<Order> {
     const settings = await this.getSettings();
     const market = await this.getMarket();
-    const win = getNextWindow();
+    // Ventana elegida por el cliente si es una de las ofrecidas; si no, la más cercana.
+    const offered = getOfferedWindows();
+    const win = offered.find((w) => w.id === input.windowId) || offered[0] || getNextWindow();
 
     // Dishes: only keep known menu items with qty > 0
     const dishes = (input.dishes || [])
@@ -314,13 +317,37 @@ export const store = {
     return order;
   },
 
+  /** Cambia la ventana (fecha de entrega) de un pedido. */
+  async setOrderWindow(id: string, windowId: string): Promise<Order | null> {
+    const order = await this.getOrder(id);
+    if (!order) return null;
+    const win = windowFromId(windowId);
+    if (!win) throw new Error("Ventana de entrega inválida");
+    order.windowId = win.id;
+    order.windowLabel = win.shortLabel;
+    if (isPersistent()) {
+      await redis().hset(K.orders, { [id]: order });
+    } else {
+      const db = await readFile();
+      db.orders[id] = order;
+      await writeFile(db);
+    }
+    return order;
+  },
+
   /** Cupos disponibles = totales − pedidos confirmados (pagados) de la ventana activa. */
   async computeCupos(): Promise<{ totales: number; disponibles: number; confirmados: number }> {
+    return this.computeCuposFor(getNextWindow().id);
+  },
+
+  /** Cupos de una ventana específica. */
+  async computeCuposFor(
+    windowId: string
+  ): Promise<{ totales: number; disponibles: number; confirmados: number }> {
     const settings = await this.getSettings();
-    const win = getNextWindow();
     const orders = await this.listOrders();
     const confirmados = orders.filter(
-      (o) => o.status === "pagado" && o.windowId === win.id
+      (o) => o.status === "pagado" && o.windowId === windowId
     ).length;
     const totales = settings.cuposTotales;
     return {

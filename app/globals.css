@@ -119,6 +119,27 @@ img,svg{max-width:100%}
 
 /* ============ SHEET / MENU ============ */
 .sheet{background:var(--crema-bg);color:var(--ink);border-radius:26px 26px 0 0;position:relative;z-index:1}
+
+/* elegir día de retiro (cliente) */
+.daypick{margin-top:30px;background:linear-gradient(180deg,#fff,var(--paper));border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow-sm)}
+.daypick-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;margin-bottom:12px}
+.daypick-kick{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;font-size:1.08rem;color:var(--bordo)}
+.daypick-sub{font-size:12px;color:var(--muted)}
+.daypick-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.daypick-opt{position:relative;text-align:left;background:var(--paper);border:1.5px solid var(--line-strong);border-radius:14px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .15s,box-shadow .15s}
+.daypick-opt:hover{border-color:var(--bordo)}
+.daypick-opt.on{border-color:var(--bordo);background:#fff;box-shadow:0 14px 30px -20px rgba(146,26,27,.6)}
+.daypick-opt .dp-day{font-family:var(--disp);font-weight:600;font-size:1.12rem;color:var(--bordo-ink);padding-right:26px}
+.daypick-opt .dp-meta{font-size:12.5px;color:var(--muted)}
+.daypick-opt.on .dp-meta{color:var(--ok);font-weight:600}
+.daypick-opt.out{opacity:.62}
+.daypick-opt.out .dp-meta{color:var(--bordo);font-weight:600}
+.daypick-opt .dp-check{position:absolute;top:13px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--bordo);color:var(--crema);display:grid;place-items:center;font-size:13px;font-weight:700;font-family:var(--body)}
+@media(max-width:520px){.daypick-opts{grid-template-columns:1fr}}
+
+/* línea de entrega en la comanda */
+.cdeliv{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);background:var(--crema-bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:10px}
+.cdeliv b{color:var(--bordo)}
 .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:34px}
 .sec-title{font-size:clamp(1.55rem,4.6vw,2.3rem);color:var(--bordo);text-transform:uppercase;letter-spacing:.02em}
 .sec-kick{font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}

@@ -56,17 +56,19 @@ export interface Order {
   completed?: boolean; // "tachado" — entregado/completado por el dueño
 }
 
+export interface WindowInfo {
+  id: string;
+  cutoffISO: string;         // absolute instant of order close
+  deliveryLabel: string;     // "Viernes"
+  deliveryDateLabel: string; // "Viernes 19 de septiembre"
+  cuposTotales: number;
+  cuposDisponibles: number;
+}
+
 export interface PublicStatus {
   menu: DishName[];
   weekLabel: string;
-  cuposTotales: number;
-  cuposDisponibles: number;
   basePrice: number;
   combos: ComboTier[];
-  window: {
-    id: string;
-    cutoffISO: string;      // absolute instant of order close
-    deliveryLabel: string;  // "Viernes"
-    deliveryDateLabel: string; // "Viernes 19 de septiembre"
-  };
+  windows: WindowInfo[];     // entregas ofrecidas (próximo viernes + próximo lunes)
 }

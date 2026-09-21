@@ -1,29 +1,34 @@
 import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
-import { getNextWindow } from "@/lib/windows";
-import type { PublicStatus } from "@/lib/types";
+import { getOfferedWindows } from "@/lib/windows";
+import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const settings = await store.getSettings();
-  const cupos = await store.computeCupos();
-  const win = getNextWindow();
+
+  const windows: WindowInfo[] = await Promise.all(
+    getOfferedWindows().map(async (w): Promise<WindowInfo> => {
+      const c = await store.computeCuposFor(w.id);
+      return {
+        id: w.id,
+        cutoffISO: w.cutoffISO,
+        deliveryLabel: w.deliveryLabel,
+        deliveryDateLabel: w.deliveryDateLabel,
+        cuposTotales: c.totales,
+        cuposDisponibles: c.disponibles,
+      };
+    })
+  );
 
   const status: PublicStatus = {
     menu: settings.menu,
     weekLabel: settings.weekLabel,
-    cuposTotales: cupos.totales,
-    cuposDisponibles: cupos.disponibles,
     basePrice: settings.basePrice,
     combos: settings.combos,
-    window: {
-      id: win.id,
-      cutoffISO: win.cutoffISO,
-      deliveryLabel: win.deliveryLabel,
-      deliveryDateLabel: win.deliveryDateLabel,
-    },
+    windows,
   };
   return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });
 }
