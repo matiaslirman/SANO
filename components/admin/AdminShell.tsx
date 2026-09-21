@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Wordmark } from "@/lib/brand";
 import { LogoutButton } from "./LogoutButton";
 
-type Tab = "pedidos" | "cocina" | "contenido";
+type Tab = "pedidos" | "cocina" | "analitica" | "contenido";
 
 export function AdminShell({
   active,
@@ -16,6 +16,7 @@ export function AdminShell({
   const tabs: { id: Tab; label: string; href: string }[] = [
     { id: "pedidos", label: "Pedidos", href: "/admin/pedidos" },
     { id: "cocina", label: "Resumen cocina", href: "/admin/cocina" },
+    { id: "analitica", label: "Analítica", href: "/admin/analitica" },
     { id: "contenido", label: "Contenido", href: "/admin/contenido" },
   ];
   return (
