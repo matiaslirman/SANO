@@ -10,6 +10,7 @@ interface Data {
   cuposTotales: number;
   cycleWindows: WinOpt[];   // entregas del ciclo actual (viernes + lunes)
   deliveryWindows: WinOpt[]; // rango de viernes/lunes para reasignar un pedido
+  event: { label: string; cuposTotales: number } | null; // pestaña del evento privado
 }
 
 const shortWinLabel = (label: string) => label.replace(/^Entrega\s+/i, "");
@@ -31,9 +32,12 @@ function itemsSummary(o: Order): string {
 export function OrdersView({ initial }: { initial: Data }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const [busyId, setBusyId] = useState<string>("");
-  const [selTab, setSelTab] = useState<string>(initial.cycleWindows[0]?.id || "hist");
+  const [selTab, setSelTab] = useState<string>(
+    initial.cycleWindows[0]?.id || (initial.event ? "event" : "hist")
+  );
 
   const cuposTotales = initial.cuposTotales;
+  const evt = initial.event;
   const cycleIds = useMemo(() => new Set(initial.cycleWindows.map((w) => w.id)), [initial.cycleWindows]);
 
   const refetch = useCallback(async () => {
@@ -136,26 +140,38 @@ export function OrdersView({ initial }: { initial: Data }) {
   };
 
   const isHist = selTab === "hist";
-  const scoped = useMemo(
-    () => (isHist ? orders.filter((o) => !cycleIds.has(o.windowId)) : orders.filter((o) => o.windowId === selTab)),
-    [orders, isHist, selTab, cycleIds]
-  );
+  const isEventTab = selTab === "event";
+  const scoped = useMemo(() => {
+    if (isEventTab) return orders.filter((o) => o.eventId);
+    if (isHist) return orders.filter((o) => !cycleIds.has(o.windowId) && !o.eventId);
+    return orders.filter((o) => o.windowId === selTab && !o.eventId);
+  }, [orders, isHist, isEventTab, selTab, cycleIds]);
   const histPending = useMemo(
-    () => orders.filter((o) => !cycleIds.has(o.windowId) && !o.completed).length,
+    () => orders.filter((o) => !cycleIds.has(o.windowId) && !o.eventId && !o.completed).length,
     [orders, cycleIds]
+  );
+  const eventPending = useMemo(
+    () => orders.filter((o) => o.eventId && !o.completed).length,
+    [orders]
   );
 
   const stats = useMemo(() => {
     const paid = scoped.filter((o) => o.status === "pagado");
+    const total = isEventTab ? (evt?.cuposTotales ?? 0) : cuposTotales;
     return {
       pedidos: scoped.length,
       confirmados: paid.length,
       revenue: paid.reduce((s, o) => s + o.total, 0),
-      disponibles: isHist ? null : Math.max(0, cuposTotales - paid.length),
+      disponibles: isHist ? null : Math.max(0, total - paid.length),
+      total,
     };
-  }, [scoped, isHist, cuposTotales]);
+  }, [scoped, isHist, isEventTab, cuposTotales, evt]);
 
-  const tabLabel = isHist ? "Histórico" : shortWinLabel(initial.cycleWindows.find((w) => w.id === selTab)?.label || "");
+  const tabLabel = isHist
+    ? "Histórico"
+    : isEventTab
+    ? "Evento"
+    : shortWinLabel(initial.cycleWindows.find((w) => w.id === selTab)?.label || "");
 
   return (
     <>
@@ -172,6 +188,20 @@ export function OrdersView({ initial }: { initial: Data }) {
             {shortWinLabel(w.label)}
           </button>
         ))}
+        {evt && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isEventTab}
+            className={`wtab wtab-event${isEventTab ? " on" : ""}`}
+            onClick={() => setSelTab("event")}
+            title={evt.label}
+          >
+            <span className="wtab-star" aria-hidden="true">★</span>
+            {evt.label}
+            {eventPending > 0 && <span className="wtab-badge">{eventPending}</span>}
+          </button>
+        )}
         <button
           type="button"
           role="tab"
@@ -195,7 +225,7 @@ export function OrdersView({ initial }: { initial: Data }) {
         </div>
         <div className="box accent">
           <div className="k">Cupos disponibles</div>
-          <div className="v">{stats.disponibles === null ? "—" : `${stats.disponibles} / ${cuposTotales}`}</div>
+          <div className="v">{stats.disponibles === null ? "—" : `${stats.disponibles} / ${stats.total}`}</div>
         </div>
         <div className="box">
           <div className="k">Ingreso confirmado</div>
@@ -234,18 +264,22 @@ export function OrdersView({ initial }: { initial: Data }) {
                   {o.whatsapp ? o.whatsapp + " · " : ""}
                   {fmtDate(o.createdAt)}
                 </small>
-                <select
-                  className="wsel"
-                  value={o.windowId}
-                  onChange={(e) => changeWindow(o, e.target.value)}
-                  disabled={busyId === o.id}
-                  aria-label={`Día de entrega de ${o.id}`}
-                  title="Cambiar día de entrega"
-                >
-                  {winOptionsFor(o).map((w) => (
-                    <option key={w.id} value={w.id}>{shortWinLabel(w.label)}</option>
-                  ))}
-                </select>
+                {o.eventId ? (
+                  <span className="wsel-static">★ {shortWinLabel(o.windowLabel)}</span>
+                ) : (
+                  <select
+                    className="wsel"
+                    value={o.windowId}
+                    onChange={(e) => changeWindow(o, e.target.value)}
+                    disabled={busyId === o.id}
+                    aria-label={`Día de entrega de ${o.id}`}
+                    title="Cambiar día de entrega"
+                  >
+                    {winOptionsFor(o).map((w) => (
+                      <option key={w.id} value={w.id}>{shortWinLabel(w.label)}</option>
+                    ))}
+                  </select>
+                )}
               </span>
               <span className="oitems">
                 {itemsSummary(o)}

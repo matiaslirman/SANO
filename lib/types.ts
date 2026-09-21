@@ -23,6 +23,22 @@ export interface Settings {
   menuPublishedAt?: string; // ISO: cuándo se publicó el menú → ancla del ciclo de entregas
 }
 
+/**
+ * Evento privado: una "ventana" aparte del sitio (ej. paquetes para un viaje),
+ * protegida por un código y editable desde el panel — mismo flujo, layout y
+ * precios que el menú semanal, pero con su propia lista de platos y una fecha
+ * de entrega fija. Reutiliza `basePrice` y `combos` de Settings.
+ */
+export interface EventSettings {
+  active: boolean;        // si está encendido, se puede entrar con el código
+  title: string;          // "Paquetes Viaje a la Playa"
+  subtitle: string;       // bajada corta en el hero
+  code: string;           // código de acceso que comparte el dueño
+  menu: DishName[];        // platos del evento
+  deliveryLabel: string;  // fecha/etiqueta fija de retiro, ej. "Retiro jueves 2 oct · 8 a.m.–12 md"
+  cuposTotales: number;   // capacidad del evento
+}
+
 export type OrderStatus = "pendiente" | "pagado";
 
 export interface OrderDishLine {
@@ -55,6 +71,7 @@ export interface Order {
   total: number;
   status: OrderStatus;
   completed?: boolean; // "tachado" — entregado/completado por el dueño
+  eventId?: string;    // si viene de un evento privado: clave del evento (agrupa su pestaña)
 }
 
 export interface WindowInfo {
