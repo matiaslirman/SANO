@@ -1,4 +1,4 @@
-import type { Settings, MarketCategory } from "./types";
+import type { Settings, MarketCategory, EventSettings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   menu: [
@@ -92,6 +92,31 @@ export const DEFAULT_MARKET: MarketCategory[] = [
     items: ["Margarita", "Jamón y Hongos"],
   },
 ];
+
+/**
+ * Evento privado por defecto: los paquetes para el viaje a la playa.
+ * El dueño lo edita desde el panel (Contenido → Evento privado) para este y
+ * futuros eventos. Arranca apagado hasta que el dueño lo activa.
+ */
+export const DEFAULT_EVENT: EventSettings = {
+  active: false,
+  title: "Paquetes para el Viaje",
+  subtitle: "Menú especial del grupo. Elegí tus platos y coordinás todo por WhatsApp.",
+  code: "PLAYA",
+  menu: [
+    "Lasagna de Pollo con Hongos y Salsa Blanca",
+    "Albóndigas de Res con Puré y Salsa de Tomate",
+    "Pasta Corta Carbonara con Pollo",
+    "Mongolian de Res con Arroz y Vegetales",
+    "Crepa de Pollo Gratinada con Salsa Blanca",
+    "Costilla 22Bistro con Arroz y Vegetales",
+    "Milanesa Caprecce Gratinada con Arroz",
+    "Pasta Pesto Cremoso con Pollo",
+    "Ravioles de Ricotta a la Boloñesa",
+  ],
+  deliveryLabel: "Retiro coordinado para el viaje",
+  cuposTotales: 30,
+};
 
 /** Productos destacados que se muestran en el upsell del checkout (categoría, índice). */
 export const SUGGESTED_UPSELL: { catId: string; itemIndex: number }[] = [

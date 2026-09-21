@@ -57,7 +57,10 @@ export function SiteFooter() {
       <div className="foot-note">
         <div className="wrap">
           <span>© Sano · 22 Bistro — Ciudad Colón</span>
-          <Link href="/admin">Panel del dueño</Link>
+          <span className="foot-links">
+            <Link href="/evento" className="foot-evento">Evento privado</Link>
+            <Link href="/admin">Panel del dueño</Link>
+          </span>
         </div>
       </div>
     </footer>

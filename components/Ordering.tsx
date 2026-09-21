@@ -10,15 +10,25 @@ const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
 const mkey = (catId: string, item: string) => `${catId}|${item}`;
 
+/** Config de evento privado: mismo flujo, con su propio encabezado y fecha fija. */
+export interface EventMode {
+  title: string;
+  subtitle: string;
+  deliveryLabel: string;
+}
+
 export function Ordering({
   initialStatus,
   initialMarket,
+  event,
 }: {
   initialStatus: PublicStatus;
   initialMarket: MarketCategory[];
+  event?: EventMode;
 }) {
+  const isEvent = !!event;
   const [status, setStatus] = useState<PublicStatus>(initialStatus);
-  const market = initialMarket;
+  const market = isEvent ? [] : initialMarket;
 
   const [dishQty, setDishQty] = useState<Record<string, number>>({});
   const [marketQty, setMarketQty] = useState<Record<string, number>>({});
@@ -88,12 +98,12 @@ export function Ordering({
   // ── refrescar estado (cupos/ventana) periódicamente ──
   const refetchStatus = useCallback(async () => {
     try {
-      const r = await fetch("/api/status", { cache: "no-store" });
+      const r = await fetch(isEvent ? "/api/evento/status" : "/api/status", { cache: "no-store" });
       if (r.ok) setStatus(await r.json());
     } catch {
       /* silencioso */
     }
-  }, []);
+  }, [isEvent]);
   useEffect(() => {
     const id = setInterval(refetchStatus, 45000);
     return () => clearInterval(id);
@@ -254,17 +264,20 @@ export function Ordering({
     const win = window.open("", "_blank");
     try {
       const payload = {
+        event: isEvent || undefined,
         customerName: name.trim(),
         notes: notes.trim(),
         windowId: selWin.id,
         dishes: Object.entries(dishQty)
           .filter(([, q]) => q > 0)
           .map(([n, q]) => ({ name: n, qty: q })),
-        market: market.flatMap((cat) =>
-          cat.items
-            .map((item) => ({ category: cat.name, name: item, qty: marketQty[mkey(cat.id, item)] || 0 }))
-            .filter((m) => m.qty > 0)
-        ),
+        market: isEvent
+          ? []
+          : market.flatMap((cat) =>
+              cat.items
+                .map((item) => ({ category: cat.name, name: item, qty: marketQty[mkey(cat.id, item)] || 0 }))
+                .filter((m) => m.qty > 0)
+            ),
       };
       const r = await fetch("/api/orders", {
         method: "POST",
@@ -309,38 +322,57 @@ export function Ordering({
       <section className={`hero ${phaseClass}`}>
         <div className="wrap">
           <div className="hero-copy">
-            <h1>
-              Resolvé almuerzos <em>y cenas.</em>
-            </h1>
-            <p className="lead">
-              Platos de chef, listos para retirar. Elegí los tuyos y coordinás todo por WhatsApp en un
-              minuto.
-            </p>
-            <div className="hero-cta">
-              <button className="btn-primary" onClick={scrollToMenu}>
-                Pedir ahora →
-              </button>
-            </div>
-            <div className="trust">
-              <span className="ig">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
-                  <circle cx="12" cy="12" r="4.2" />
-                  <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none" />
-                </svg>
-                @sanoby22bistro
-              </span>
-              <span className="sep" />
-              <span>+2.000 platos vendidos</span>
-              <span className="sep trust-extra" />
-              <span className="trust-extra">Atención personalizada 1 a 1</span>
-            </div>
+            {isEvent ? (
+              <>
+                <span className="hero-event-kick">Evento privado · Sano</span>
+                <h1>{event!.title}</h1>
+                <p className="lead">{event!.subtitle}</p>
+                <div className="hero-cta">
+                  <button className="btn-primary" onClick={scrollToMenu}>
+                    Elegir mis platos →
+                  </button>
+                </div>
+                <div className="hero-event-date">
+                  {IconCal}
+                  <span>{event!.deliveryLabel}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1>
+                  Resolvé almuerzos <em>y cenas.</em>
+                </h1>
+                <p className="lead">
+                  Platos de chef, listos para retirar. Elegí los tuyos y coordinás todo por WhatsApp en un
+                  minuto.
+                </p>
+                <div className="hero-cta">
+                  <button className="btn-primary" onClick={scrollToMenu}>
+                    Pedir ahora →
+                  </button>
+                </div>
+                <div className="trust">
+                  <span className="ig">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+                      <circle cx="12" cy="12" r="4.2" />
+                      <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none" />
+                    </svg>
+                    @sanoby22bistro
+                  </span>
+                  <span className="sep" />
+                  <span>+2.000 platos vendidos</span>
+                  <span className="sep trust-extra" />
+                  <span className="trust-extra">Atención personalizada 1 a 1</span>
+                </div>
 
-            {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
-            <div className="hero-urgency" ref={heroPillRef}>
-              {renderPill(true)}
-              <span className="sr-only" role="timer">{cdA11y}</span>
-            </div>
+                {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
+                <div className="hero-urgency" ref={heroPillRef}>
+                  {renderPill(true)}
+                  <span className="sr-only" role="timer">{cdA11y}</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* SELLO — recurso de marca oficial (lib/brand · Seal) */}
@@ -354,7 +386,7 @@ export function Ordering({
       <div className="sheet">
         <div className="wrap">
           {/* ELEGIR DÍA DE RETIRO */}
-          {status.windows.length > 0 && (
+          {!isEvent && status.windows.length > 0 && (
             <div className="daypick">
               <div className="daypick-head">
                 <span className="daypick-kick">Elegí tu día de retiro</span>
@@ -387,8 +419,8 @@ export function Ordering({
           {/* MENU */}
           <div className="sec-head" id="menu">
             <div>
-              <div className="sec-kick">Platos listos · Sano Premium</div>
-              <h2 className="sec-title">Menú de la semana</h2>
+              <div className="sec-kick">{isEvent ? "Menú del evento · Sano" : "Platos listos · Sano Premium"}</div>
+              <h2 className="sec-title">{isEvent ? "Elegí tus platos" : "Menú de la semana"}</h2>
             </div>
             <span className="week-pill">{status.weekLabel}</span>
           </div>
@@ -438,6 +470,7 @@ export function Ordering({
           </div>
 
           {/* MARKET */}
+          {!isEvent && (
           <div className="market" id="market">
             <div className="mhead">
               <div>
@@ -498,6 +531,7 @@ export function Ordering({
               </div>
             )}
           </div>
+          )}
 
           {/* CHECKOUT */}
           <div className="checkout" id="checkout">
@@ -535,7 +569,11 @@ export function Ordering({
                       )}
                       <div className="cdeliv">
                         {IconCal}
-                        <span>Retiro <b>{selWin.deliveryDateLabel}</b> · 8 a.m. – 12 md</span>
+                        {isEvent ? (
+                          <span><b>{selWin.deliveryDateLabel}</b></span>
+                        ) : (
+                          <span>Retiro <b>{selWin.deliveryDateLabel}</b> · 8 a.m. – 12 md</span>
+                        )}
                       </div>
                       {totals.dishesQty > 0 && <div className="csub">Platos listos</div>}
                       {status.menu.map((dish) => {
@@ -624,16 +662,18 @@ export function Ordering({
       </div>
 
       {/* PILL de urgencia flotante — aparece cuando el pill del hero sale de vista */}
-      <button
-        type="button"
-        className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
-        onClick={scrollToMenu}
-        aria-hidden={pillShow && !created ? undefined : true}
-        tabIndex={pillShow && !created ? 0 : -1}
-        aria-label={`${cdA11y} Tocá para ir al menú.`}
-      >
-        {renderPill(false)}
-      </button>
+      {!isEvent && (
+        <button
+          type="button"
+          className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
+          onClick={scrollToMenu}
+          aria-hidden={pillShow && !created ? undefined : true}
+          tabIndex={pillShow && !created ? 0 : -1}
+          aria-label={`${cdA11y} Tocá para ir al menú.`}
+        >
+          {renderPill(false)}
+        </button>
+      )}
 
       {/* sticky total */}
       <div className={`sticky${totals.grand > 0 && !created ? " show" : ""}`}>
