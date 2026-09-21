@@ -7,9 +7,10 @@ export const dynamic = "force-dynamic";
 export default async function ContenidoPage() {
   const settings = await store.getSettings();
   const market = await store.getMarket();
+  const event = await store.getEvent();
   return (
     <AdminShell active="contenido" title="Contenido">
-      <ContentEditor initialSettings={settings} initialMarket={market} />
+      <ContentEditor initialSettings={settings} initialMarket={market} initialEvent={event} />
     </AdminShell>
   );
 }

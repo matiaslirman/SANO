@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Settings, MarketCategory, ComboTier } from "@/lib/types";
+import type { Settings, MarketCategory, ComboTier, EventSettings } from "@/lib/types";
 
 function Saved({ show }: { show: boolean }) {
   if (!show) return null;
@@ -11,9 +11,11 @@ function Saved({ show }: { show: boolean }) {
 export function ContentEditor({
   initialSettings,
   initialMarket,
+  initialEvent,
 }: {
   initialSettings: Settings;
   initialMarket: MarketCategory[];
+  initialEvent: EventSettings;
 }) {
   // ── Menú ──
   const [menu, setMenu] = useState<string[]>(initialSettings.menu);
@@ -36,6 +38,13 @@ export function ContentEditor({
   const [market, setMarket] = useState<MarketCategory[]>(initialMarket);
   const [savedMarket, setSavedMarket] = useState(false);
   const [busyMarket, setBusyMarket] = useState(false);
+
+  // ── Evento privado ──
+  const [ev, setEv] = useState<EventSettings>(initialEvent);
+  const [savedEvent, setSavedEvent] = useState(false);
+  const [busyEvent, setBusyEvent] = useState(false);
+  const setEvField = <K extends keyof EventSettings>(k: K, v: EventSettings[K]) =>
+    setEv((e) => ({ ...e, [k]: v }));
 
   async function patchSettings(body: Partial<Settings>) {
     const r = await fetch("/api/settings", {
@@ -92,13 +101,40 @@ export function ContentEditor({
       setBusyMarket(false);
     }
   }
+  async function saveEvent() {
+    setBusyEvent(true);
+    try {
+      const r = await fetch("/api/evento", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          active: ev.active,
+          title: ev.title.trim(),
+          subtitle: ev.subtitle.trim(),
+          code: ev.code.trim(),
+          deliveryLabel: ev.deliveryLabel.trim(),
+          cuposTotales: ev.cuposTotales,
+          menu: ev.menu.map((m) => m.trim()).filter(Boolean),
+        }),
+      });
+      if (!r.ok) throw new Error("No se pudo guardar");
+      const saved = (await r.json()).event as EventSettings;
+      setEv(saved);
+      flash(setSavedEvent);
+    } finally {
+      setBusyEvent(false);
+    }
+  }
 
   return (
     <>
       {/* MENÚ */}
       <div className="editcard">
         <h3>Menú de la semana</h3>
-        <div className="sub">Editá los platos como una lista. Se reflejan al instante en el sitio del cliente.</div>
+        <div className="sub">
+          Editá los platos de la semana. <b>Al guardar se abre una nueva semana de entregas</b> (viernes + lunes):
+          los pedidos nuevos entran a ese ciclo y las entregas anteriores pasan al Histórico de Pedidos.
+        </div>
         <div className="field" style={{ marginTop: 0, marginBottom: 14 }}>
           <label>Etiqueta de la semana</label>
           <input value={weekLabel} onChange={(e) => setWeekLabel(e.target.value)} placeholder="Ej: Semana del 15 al 21 sep" />
@@ -122,9 +158,86 @@ export function ContentEditor({
         </button>
         <div>
           <button className="save-btn" onClick={saveMenu} disabled={busyMenu}>
-            {busyMenu ? "Guardando…" : "Guardar menú"}
+            {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
           </button>
           <Saved show={savedMenu} />
+        </div>
+      </div>
+
+      {/* EVENTO PRIVADO */}
+      <div className="editcard">
+        <h3>Evento privado</h3>
+        <div className="sub">
+          Una ventana aparte del sitio para un grupo (ej. un viaje): mismo flujo y precios, con su propia
+          lista de platos y una fecha fija. Se entra con un <b>código</b> desde el enlace{" "}
+          <b>“Evento privado”</b> al pie de la página. Reusá esta ficha para futuros eventos.
+        </div>
+
+        <label className="ev-toggle">
+          <input
+            type="checkbox"
+            checked={ev.active}
+            onChange={(e) => setEvField("active", e.target.checked)}
+          />
+          <span>
+            <b>Evento activo</b> — {ev.active ? "el grupo puede entrar con el código." : "apagado: nadie puede entrar."}
+          </span>
+        </label>
+
+        <div className="ev-grid">
+          <div className="field">
+            <label>Título del evento</label>
+            <input value={ev.title} onChange={(e) => setEvField("title", e.target.value)} placeholder="Ej: Paquetes Viaje a la Playa" />
+          </div>
+          <div className="field">
+            <label>Código de acceso</label>
+            <input value={ev.code} onChange={(e) => setEvField("code", e.target.value)} placeholder="Ej: PLAYA2026" />
+          </div>
+          <div className="field">
+            <label>Cupos totales</label>
+            <input type="number" min={0} value={ev.cuposTotales} onChange={(e) => setEvField("cuposTotales", parseInt(e.target.value) || 0)} />
+          </div>
+          <div className="field">
+            <label>Fecha / etiqueta de retiro</label>
+            <input value={ev.deliveryLabel} onChange={(e) => setEvField("deliveryLabel", e.target.value)} placeholder="Ej: Retiro jueves 2 oct · 8 a.m.–12 md" />
+          </div>
+        </div>
+        <div className="field" style={{ marginTop: 0, marginBottom: 14 }}>
+          <label>Bajada (texto corto del encabezado)</label>
+          <input value={ev.subtitle} onChange={(e) => setEvField("subtitle", e.target.value)} placeholder="Ej: Menú especial del grupo del viaje." />
+        </div>
+
+        <label style={{ fontSize: 12.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
+          Platos del evento
+        </label>
+        <div className="edit-list" style={{ marginTop: 8 }}>
+          {ev.menu.map((dish, i) => (
+            <div className="er" key={i}>
+              <span className="n">{i + 1}</span>
+              <input
+                value={dish}
+                onChange={(e) => setEv((s) => ({ ...s, menu: s.menu.map((x, j) => (j === i ? e.target.value : x)) }))}
+              />
+              <button className="obtn" onClick={() => setEv((s) => ({ ...s, menu: s.menu.filter((_, j) => j !== i) }))}>
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+        <button className="obtn" style={{ marginTop: 12 }} onClick={() => setEv((s) => ({ ...s, menu: [...s.menu, ""] }))}>
+          + Agregar plato
+        </button>
+
+        <div className="ev-hint">
+          Enlace para compartir: <b>tu-sitio.com/evento</b> · Código actual: <b>{ev.code || "—"}</b> ·{" "}
+          {ev.active ? "activo ✓" : "apagado"}
+        </div>
+
+        <div>
+          <button className="save-btn" onClick={saveEvent} disabled={busyEvent}>
+            {busyEvent ? "Guardando…" : "Guardar evento"}
+          </button>
+          <Saved show={savedEvent} />
         </div>
       </div>
 

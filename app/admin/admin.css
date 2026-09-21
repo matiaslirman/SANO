@@ -27,6 +27,8 @@
 .wtab.on{background:var(--bordo);color:var(--crema);border-color:var(--bordo)}
 .wtab-dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
 .wtab.on .wtab-dot{background:var(--crema)}
+.wtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;line-height:1}
+.wtab.on .wtab-badge{background:#fff;color:var(--bordo)}
 
 /* aviso de pedidos de ventanas anteriores sin completar */
 .walert{margin-top:16px;background:#FBF1DE;border:1px solid #EFDCB4;color:#7a4d0a;border-radius:12px;padding:12px 15px;font-size:13.5px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -122,3 +124,15 @@
   .kbar{display:none}          /* en móvil priorizamos el nombre sobre la barra de volumen */
   .krow{gap:12px}
 }
+
+/* ============ EVENTO PRIVADO (panel) ============ */
+.wtab-event .wtab-star{color:#C79A3E;font-size:12px;line-height:1}
+.wtab-event.on .wtab-star{color:var(--crema)}
+.wsel-static{margin-top:6px;display:inline-block;font-family:var(--body);font-size:12px;font-weight:600;color:var(--bordo-ink);background:#FBF1DE;border:1px solid #EFDCB4;border-radius:8px;padding:5px 8px}
+.ev-toggle{display:flex;align-items:center;gap:10px;margin:6px 0 16px;font-size:13.5px;color:var(--ink)}
+.ev-toggle input{width:18px;height:18px}
+.ev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;margin-bottom:4px}
+.ev-grid .field{margin-top:0}
+.ev-hint{margin-top:14px;background:var(--crema-bg);border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--muted)}
+.ev-hint b{color:var(--bordo-ink)}
+@media(max-width:600px){.ev-grid{grid-template-columns:1fr}}
