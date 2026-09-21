@@ -40,13 +40,7 @@ function nextCutoffForDow(now: Date, dowUTC: number): Date {
   return d;
 }
 
-export function getNextWindow(now: Date = new Date()): DeliveryWindow {
-  const thu = nextCutoffForDow(now, 4); // Jueves -> Viernes
-  const sat = nextCutoffForDow(now, 6); // Sábado -> Lunes
-  const isThu = thu.getTime() <= sat.getTime();
-  const cutoff = isThu ? thu : sat;
-  const offset = isThu ? 1 : 2; // días desde el cierre hasta la entrega
-
+function buildWindow(cutoff: Date, offset: number): DeliveryWindow {
   const delivery = new Date(cutoff.getTime());
   delivery.setUTCDate(delivery.getUTCDate() + offset);
 
@@ -62,4 +56,32 @@ export function getNextWindow(now: Date = new Date()): DeliveryWindow {
     deliveryDateLabel: `${dLabel} ${day} de ${MESES[month]}`,
     shortLabel: `Entrega ${dLabel} ${day} ${MESES_CORTO[month]}`,
   };
+}
+
+/** El próximo cierre (la ventana más cercana). */
+export function getNextWindow(now: Date = new Date()): DeliveryWindow {
+  const thu = nextCutoffForDow(now, 4); // Jueves -> Viernes
+  const sat = nextCutoffForDow(now, 6); // Sábado -> Lunes
+  const isThu = thu.getTime() <= sat.getTime();
+  return buildWindow(isThu ? thu : sat, isThu ? 1 : 2);
+}
+
+/** Las entregas ofrecidas al cliente: el próximo viernes y el próximo lunes, ordenadas por cierre. */
+export function getOfferedWindows(now: Date = new Date()): DeliveryWindow[] {
+  const fri = buildWindow(nextCutoffForDow(now, 4), 1); // Jueves 12md -> Viernes
+  const mon = buildWindow(nextCutoffForDow(now, 6), 2); // Sábado 12md -> Lunes
+  return [fri, mon].sort((a, b) => a.cutoff.getTime() - b.cutoff.getTime());
+}
+
+/**
+ * Reconstruye una ventana a partir de su id (fecha de cierre YYYY-MM-DD).
+ * Jueves -> entrega Viernes (+1); Sábado -> entrega Lunes (+2).
+ */
+export function windowFromId(id: string): DeliveryWindow | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) return null;
+  const cutoff = new Date(`${id}T${String(HOUR_UTC).padStart(2, "0")}:00:00.000Z`);
+  if (Number.isNaN(cutoff.getTime())) return null;
+  const dow = cutoff.getUTCDay();
+  const offset = dow === 4 ? 1 : dow === 6 ? 2 : 2; // por defecto, entrega 2 días después
+  return buildWindow(cutoff, offset);
 }

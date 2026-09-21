@@ -50,6 +50,9 @@
 .ono-btn{border:0;background:transparent;padding:2px 0;cursor:pointer;font-size:inherit;text-align:left;border-bottom:1px dashed transparent}
 .ono-btn:hover{border-bottom-color:var(--bordo)}
 .ono-btn:disabled{opacity:.5;cursor:default}
+.wsel{margin-top:6px;display:inline-block;max-width:100%;font-family:var(--body);font-size:12px;font-weight:600;color:var(--bordo-ink);background:var(--crema-bg);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px;cursor:pointer}
+.wsel:hover{border-color:var(--bordo)}
+.wsel:disabled{opacity:.5;cursor:default}
 .oname{font-weight:600}
 .oname small{display:block;color:var(--muted);font-weight:400;font-size:12px}
 .oitems{font-size:13px;color:var(--muted);line-height:1.4}

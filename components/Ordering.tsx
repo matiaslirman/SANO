@@ -29,6 +29,19 @@ export function Ordering({
   const [created, setCreated] = useState<Order | null>(null);
   const [toast, setToast] = useState("");
 
+  // ── entrega elegida por el cliente (próximo viernes / próximo lunes) ──
+  const [selWinId, setSelWinId] = useState<string>(() => initialStatus.windows[0]?.id || "");
+  const selWin =
+    status.windows.find((w) => w.id === selWinId) ||
+    status.windows[0] || {
+      id: "",
+      cutoffISO: new Date().toISOString(),
+      deliveryLabel: "",
+      deliveryDateLabel: "",
+      cuposTotales: 0,
+      cuposDisponibles: 0,
+    };
+
   // ── countdown (solo tras montar, para evitar mismatch de hidratación) ──
   const [cd, setCd] = useState({
     d: 0, h: 0, m: 0, s: 0,
@@ -36,7 +49,7 @@ export function Ordering({
     totalMin: Number.POSITIVE_INFINITY, closed: false,
   });
   useEffect(() => {
-    const target = new Date(status.window.cutoffISO).getTime();
+    const target = new Date(selWin.cutoffISO).getTime();
     const p = (n: number) => String(n).padStart(2, "0");
     const tick = () => {
       const raw = target - Date.now();
@@ -56,7 +69,7 @@ export function Ordering({
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [status.window.cutoffISO]);
+  }, [selWin.cutoffISO]);
 
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
   const heroPillRef = useRef<HTMLDivElement>(null);
@@ -120,7 +133,7 @@ export function Ordering({
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
-  const soldOut = status.cuposDisponibles <= 0;
+  const soldOut = selWin.cuposDisponibles <= 0;
   const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !submitting;
 
   // ── suggested para el upsell (4 destacados) ──
@@ -143,8 +156,8 @@ export function Ordering({
       return { ...q, [k]: Math.max(0, Math.min(20, (q[k] || 0) + delta)) };
     });
 
-  const cuposPct = status.cuposTotales
-    ? Math.round((status.cuposDisponibles / status.cuposTotales) * 100)
+  const cuposPct = selWin.cuposTotales
+    ? Math.round((selWin.cuposDisponibles / selWin.cuposTotales) * 100)
     : 0;
 
   // ── fase de urgencia del countdown ──
@@ -156,7 +169,7 @@ export function Ordering({
   const cdTime = closed ? "Cerrado" : `${cd.d > 0 ? cd.dd + "d " : ""}${cd.hh}:${cd.mm}:${cd.ss}`;
   const cuposText = soldOut
     ? "Sin cupos"
-    : `${status.cuposDisponibles} ${status.cuposDisponibles === 1 ? "cupo" : "cupos"}`;
+    : `${selWin.cuposDisponibles} ${selWin.cuposDisponibles === 1 ? "cupo" : "cupos"}`;
   const cdA11y = closed
     ? "El cierre de pedidos de esta ventana ya pasó."
     : `Los pedidos cierran en ${cd.d > 0 ? `${cd.d} días, ` : ""}${cd.h} horas y ${cd.m} minutos. Quedan ${cuposText}.`;
@@ -172,14 +185,14 @@ export function Ordering({
       </span>
       <span className="pill-sep" />
       <span className="pill-cupos">
-        {soldOut ? "Sin cupos" : <><b>{status.cuposDisponibles}</b> {status.cuposDisponibles === 1 ? "cupo" : "cupos"}</>}
+        {soldOut ? "Sin cupos" : <><b>{selWin.cuposDisponibles}</b> {selWin.cuposDisponibles === 1 ? "cupo" : "cupos"}</>}
       </span>
       {withDate && (
         <>
           <span className="pill-sep pill-date-sep" />
           <span className="pill-date">
             {IconCal}
-            <span>{status.window.deliveryDateLabel} · 8 a.m.–12 md</span>
+            <span>{selWin.deliveryDateLabel} · 8 a.m.–12 md</span>
           </span>
         </>
       )}
@@ -243,6 +256,7 @@ export function Ordering({
       const payload = {
         customerName: name.trim(),
         notes: notes.trim(),
+        windowId: selWin.id,
         dishes: Object.entries(dishQty)
           .filter(([, q]) => q > 0)
           .map(([n, q]) => ({ name: n, qty: q })),
@@ -339,6 +353,37 @@ export function Ordering({
       {/* ============ SHEET ============ */}
       <div className="sheet">
         <div className="wrap">
+          {/* ELEGIR DÍA DE RETIRO */}
+          {status.windows.length > 0 && (
+            <div className="daypick">
+              <div className="daypick-head">
+                <span className="daypick-kick">Elegí tu día de retiro</span>
+                <span className="daypick-sub">Mismo menú · retiro en el local 8 a.m. – 12 md</span>
+              </div>
+              <div className="daypick-opts">
+                {status.windows.map((w) => {
+                  const sel = w.id === selWin.id;
+                  const out = w.cuposDisponibles <= 0;
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      className={`daypick-opt${sel ? " on" : ""}${out ? " out" : ""}`}
+                      aria-pressed={sel}
+                      onClick={() => setSelWinId(w.id)}
+                    >
+                      <span className="dp-day">{w.deliveryDateLabel}</span>
+                      <span className="dp-meta">
+                        {out ? "Sin cupos" : `Quedan ${w.cuposDisponibles} de ${w.cuposTotales} cupos`}
+                      </span>
+                      {sel && <span className="dp-check" aria-hidden="true">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* MENU */}
           <div className="sec-head" id="menu">
             <div>
@@ -488,6 +533,10 @@ export function Ordering({
                           {name.trim()}
                         </div>
                       )}
+                      <div className="cdeliv">
+                        {IconCal}
+                        <span>Retiro <b>{selWin.deliveryDateLabel}</b> · 8 a.m. – 12 md</span>
+                      </div>
                       {totals.dishesQty > 0 && <div className="csub">Platos listos</div>}
                       {status.menu.map((dish) => {
                         const q = dishQty[dish] || 0;
