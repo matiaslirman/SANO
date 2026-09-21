@@ -155,7 +155,9 @@ img,svg{max-width:100%}
 .stepper .add{color:var(--muted);font-family:var(--body);font-size:13px;font-weight:600;padding-inline:10px}
 
 /* ============ MARKET ============ */
-.market{margin-top:36px;background:linear-gradient(180deg,#fff,var(--paper));border:1px solid var(--line);border-radius:20px;padding:22px}
+.market{position:relative;margin-top:40px;background:linear-gradient(180deg,#fff,var(--paper));border:2px solid var(--bordo);border-radius:20px;padding:24px 22px 22px;box-shadow:0 20px 44px -26px rgba(146,26,27,.55),0 0 0 4px rgba(146,26,27,.07)}
+/* etiqueta gancho para destacar el upsell */
+.market::before{content:"★ Sumá tus favoritos";position:absolute;top:-12px;right:20px;background:var(--bordo);color:var(--crema);font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:5px 13px;border-radius:999px;box-shadow:var(--shadow-sm);white-space:nowrap}
 .market .mhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .market h3{font-size:1.35rem;color:var(--bordo);text-transform:uppercase;letter-spacing:.02em}
 .market .mkick{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
