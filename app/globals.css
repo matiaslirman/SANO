@@ -87,6 +87,14 @@ img,svg{max-width:100%}
 .hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
 @keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
 
+/* tarjeta de cliente frecuente en el hero (sitio público) — arte + descarga */
+.hero-loyalty{display:flex;flex-direction:column;align-items:center;gap:14px;justify-self:center;max-width:100%}
+.hero-loyalty-img{width:min(440px,92%);height:auto;filter:drop-shadow(0 30px 52px rgba(0,0,0,.5));animation:cardFloat 7s ease-in-out infinite;transform-origin:center}
+@keyframes cardFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.loyalty-cta{display:inline-flex;align-items:center;gap:8px;background:rgba(255,241,180,.1);color:var(--crema);border:1px solid rgba(255,241,180,.5);font-family:var(--disp);font-weight:600;letter-spacing:.03em;text-transform:uppercase;font-size:12.5px;padding:11px 17px;border-radius:11px;text-decoration:none;text-align:center;line-height:1.2}
+.loyalty-cta:hover{background:rgba(255,241,180,.2);border-color:var(--crema)}
+.loyalty-cta-sub{font-size:12px;color:var(--crema-soft);text-align:center;max-width:36ch}
+
 .hero-urgency{margin-top:20px}
 
 /* ---- PILL (compartido: anclado en el hero + flotante al scrollear) ---- */
@@ -118,10 +126,10 @@ img,svg{max-width:100%}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* ============ SHEET / MENU ============ */
-.sheet{background:var(--crema-bg);color:var(--ink);border-radius:26px 26px 0 0;position:relative;z-index:1}
+.sheet{background:var(--crema-bg);color:var(--ink);border-radius:26px 26px 0 0;position:relative;z-index:1;padding-bottom:44px}
 
 /* elegir día de retiro (cliente) */
-.daypick{margin-top:30px;background:linear-gradient(180deg,#fff,var(--paper));border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow-sm)}
+.daypick{margin-top:32px;background:linear-gradient(180deg,#fff,var(--paper));border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow-sm)}
 .daypick-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;margin-bottom:12px}
 .daypick-kick{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;font-size:1.08rem;color:var(--bordo)}
 .daypick-sub{font-size:12px;color:var(--muted)}
@@ -140,7 +148,7 @@ img,svg{max-width:100%}
 /* línea de entrega en la comanda */
 .cdeliv{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);background:var(--crema-bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:10px}
 .cdeliv b{color:var(--bordo)}
-.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:34px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:32px}
 .sec-title{font-size:clamp(1.55rem,4.6vw,2.3rem);color:var(--bordo);text-transform:uppercase;letter-spacing:.02em}
 .sec-kick{font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
 .week-pill{font-family:var(--disp);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--bordo);background:#fff;border:1px solid var(--line-strong);border-radius:999px;padding:8px 15px;box-shadow:var(--shadow-sm)}
@@ -159,7 +167,7 @@ img,svg{max-width:100%}
 .combo-cell.featured .cc-l{color:var(--crema-soft)}
 .combo-cell .cc-tag{position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--crema);color:var(--bordo-ink);font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap;box-shadow:var(--shadow-sm)}
 
-.menu-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:20px}
+.menu-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px}
 .dish{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px 16px 15px;display:flex;flex-direction:column;gap:13px;transition:border-color .15s,box-shadow .15s}
 .dish.active{border-color:var(--bordo);box-shadow:0 14px 30px -20px rgba(146,26,27,.6)}
 .dish .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -251,7 +259,7 @@ img,svg{max-width:100%}
 .sticky .go:disabled{cursor:not-allowed}
 
 /* ============ FOOTER ============ */
-footer{background:var(--bordo-darker);color:var(--crema-soft);margin-top:44px}
+footer{background:var(--bordo-darker);color:var(--crema-soft);margin-top:0}
 footer .wrap{padding-block:38px 30px;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:26px}
 footer h4{font-family:var(--disp);color:var(--crema);text-transform:uppercase;letter-spacing:.1em;font-size:13px;margin-bottom:12px}
 footer p,footer .flink{font-size:13.5px;color:var(--crema-soft);text-decoration:none;line-height:1.7;display:block}
@@ -306,6 +314,17 @@ footer .fbrand{margin-bottom:12px}
   .sticky .go{padding:13px 16px;font-size:.92rem}
   .brand-logo svg{height:27px}
   .nav a{padding:8px 10px;font-size:12.5px}
+  /* ritmo vertical más parejo en móvil: cortes grandes más cortos */
+  .daypick{margin-top:22px}
+  .sec-head{padding-top:26px}
+  .menu-grid{margin-top:14px}
+  .market{margin-top:28px}
+  .checkout{margin-top:28px}
+  .sheet{padding-bottom:32px}
+  /* tarjeta de cliente frecuente: visible bajo el texto, más compacta */
+  .hero-loyalty{gap:12px;margin-top:4px}
+  .hero-loyalty-img{width:min(300px,76%)}
+  .loyalty-cta{font-size:12px;padding:11px 15px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
