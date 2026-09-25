@@ -7,6 +7,7 @@ import { crc } from "@/lib/format";
 import { Seal } from "@/lib/brand";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
+const LOYALTY_URL = "https://add2wallet.com/SANO%20by%2022Bistro/wallet-pass/61/download";
 
 const mkey = (catId: string, item: string) => `${catId}|${item}`;
 
@@ -375,10 +376,28 @@ export function Ordering({
             )}
           </div>
 
-          {/* SELLO — recurso de marca oficial (lib/brand · Seal) */}
-          <div className="hero-visual" aria-hidden="true">
-            <Seal className="hero-seal" />
-          </div>
+          {isEvent ? (
+            /* SELLO — recurso de marca oficial (lib/brand · Seal) */
+            <div className="hero-visual" aria-hidden="true">
+              <Seal className="hero-seal" />
+            </div>
+          ) : (
+            /* Tarjeta de cliente frecuente: arte + descarga del wallet-pass */
+            <div className="hero-loyalty">
+              <img
+                className="hero-loyalty-img"
+                src="/brand/tarjeta-cliente.webp"
+                width={2000}
+                height={1786}
+                alt="Tarjeta de cliente frecuente SANO: sumás sellos y recibís recordatorios y promos cada semana"
+                loading="eager"
+              />
+              <a className="loyalty-cta" href={LOYALTY_URL} target="_blank" rel="noopener noreferrer">
+                📲 Descargá tu tarjeta de cliente frecuente →
+              </a>
+              <span className="loyalty-cta-sub">Sumá sellos y recibí recordatorios y promos cada semana.</span>
+            </div>
+          )}
         </div>
       </section>
 
