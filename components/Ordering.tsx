@@ -395,7 +395,7 @@ export function Ordering({
               <a className="loyalty-cta" href={LOYALTY_URL} target="_blank" rel="noopener noreferrer">
                 📲 Descargá tu tarjeta de cliente frecuente →
               </a>
-              <span className="loyalty-cta-sub">Sumá sellos y recibí recordatorios y promos cada semana.</span>
+              <span className="loyalty-cta-sub">Sumá sellos por compra, recibí recordatorios y promos cada semana.</span>
             </div>
           )}
         </div>
