@@ -136,3 +136,8 @@
 .ev-hint{margin-top:14px;background:var(--crema-bg);border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:12.5px;color:var(--muted)}
 .ev-hint b{color:var(--bordo-ink)}
 @media(max-width:600px){.ev-grid{grid-template-columns:1fr}}
+
+/* analítica: producción por plato */
+.aprod-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px}
+.aprod-sel{border:1px solid var(--line-strong);background:#fff;color:var(--bordo-ink);border-radius:999px;padding:9px 15px;font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer;max-width:100%}
+.aprod-note{font-size:13px;color:var(--muted);margin:6px 0 4px}
