@@ -441,7 +441,7 @@ export function Ordering({
                     >
                       <span className="dp-day">{w.deliveryDateLabel}</span>
                       <span className="dp-meta">
-                        {out ? "Sin cupos" : `Quedan ${w.cuposDisponibles} de ${w.cuposTotales} cupos`}
+                        {out ? "Sin cupos" : `${w.cuposDisponibles} ${w.cuposDisponibles === 1 ? "cupo disponible" : "cupos disponibles"}`}
                       </span>
                       {sel && <span className="dp-check" aria-hidden="true">✓</span>}
                     </button>
