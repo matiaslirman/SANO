@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
 import type { WinOpt } from "./WindowTabs";
+import { DaySelect, type DayOpt } from "./DaySelect";
 
 interface Data {
   orders: Order[];
@@ -155,6 +156,13 @@ export function OrdersView({ initial }: { initial: Data }) {
     [orders]
   );
 
+  const dayOptions = useMemo<DayOpt[]>(() => {
+    const opts: DayOpt[] = initial.cycleWindows.map((w) => ({ id: w.id, label: shortWinLabel(w.label) }));
+    if (evt) opts.push({ id: "event", label: `★ ${evt.label}`, badge: eventPending });
+    opts.push({ id: "hist", label: "Histórico", badge: histPending });
+    return opts;
+  }, [initial.cycleWindows, evt, eventPending, histPending]);
+
   const stats = useMemo(() => {
     const paid = scoped.filter((o) => o.status === "pagado");
     const total = isEventTab ? (evt?.cuposTotales ?? 0) : cuposTotales;
@@ -175,43 +183,8 @@ export function OrdersView({ initial }: { initial: Data }) {
 
   return (
     <>
-      <div className="wtabs" role="tablist" aria-label="Entrega">
-        {initial.cycleWindows.map((w) => (
-          <button
-            key={w.id}
-            type="button"
-            role="tab"
-            aria-selected={selTab === w.id}
-            className={`wtab${selTab === w.id ? " on" : ""}`}
-            onClick={() => setSelTab(w.id)}
-          >
-            {shortWinLabel(w.label)}
-          </button>
-        ))}
-        {evt && (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isEventTab}
-            className={`wtab wtab-event${isEventTab ? " on" : ""}`}
-            onClick={() => setSelTab("event")}
-            title={evt.label}
-          >
-            <span className="wtab-star" aria-hidden="true">★</span>
-            {evt.label}
-            {eventPending > 0 && <span className="wtab-badge">{eventPending}</span>}
-          </button>
-        )}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={isHist}
-          className={`wtab${isHist ? " on" : ""}`}
-          onClick={() => setSelTab("hist")}
-        >
-          Histórico
-          {histPending > 0 && <span className="wtab-badge">{histPending}</span>}
-        </button>
+      <div className="wtabs">
+        <DaySelect options={dayOptions} value={selTab} onChange={setSelTab} />
       </div>
 
       <div className="astat">
