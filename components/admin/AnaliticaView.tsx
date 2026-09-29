@@ -34,6 +34,7 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
 export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos: ComboTier[] } }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const combos = initial.combos;
+  const [prodWin, setProdWin] = useState<string>("all");
 
   const refetch = useCallback(async () => {
     try {
@@ -98,78 +99,128 @@ export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos:
     const sueltos = paid.filter((o) => o.dishesQty > 0 && (tiers.length === 0 || o.dishesQty < tiers[0].min)).length;
     if (sueltos > 0) comboDist.unshift({ label: "Sueltos (sin combo)", value: sueltos });
 
+    // Proyectado = todos los pedidos (pendientes + pagados); por cobrar = lo que falta confirmar
+    const proyectado = orders.reduce((s, o) => s + o.total, 0);
+    const porCobrar = proyectado - ingreso;
+    const tasaPago = orders.length ? Math.round((paid.length / orders.length) * 100) : 0;
+
+    // Ventanas disponibles para la producción (más recientes primero)
+    const winSeen: Record<string, { id: string; label: string }> = {};
+    for (const o of orders) {
+      if (!winSeen[o.windowId]) winSeen[o.windowId] = { id: o.windowId, label: o.windowLabel || o.windowId };
+    }
+    const prodWindows = Object.values(winSeen).sort((x, y) => y.id.localeCompare(x.id));
+
     return {
+      proyectado, porCobrar, tasaPago, prodWindows,
       ingreso, ingresoPlatos, ingresoMarket, platos, marketItems, ticket,
       pagados: paid.length, total: orders.length, pendientes: orders.length - paid.length,
       topDishes, topMarket, byWindow, comboDist: comboDist.filter((c) => c.value > 0),
     };
   }, [orders, combos]);
 
-  const hasPaid = a.pagados > 0;
+  // Producción por plato: pendiente + pagado de la ventana elegida (o de todas)
+  const prod = useMemo(() => {
+    const scoped = prodWin === "all" ? orders : orders.filter((o) => o.windowId === prodWin);
+    const map: Record<string, { total: number; paid: number }> = {};
+    for (const o of scoped) {
+      for (const d of o.dishes) {
+        const m = (map[d.name] = map[d.name] || { total: 0, paid: 0 });
+        m.total += d.qty;
+        if (o.status === "pagado") m.paid += d.qty;
+      }
+    }
+    const rows = Object.entries(map)
+      .map(([label, m]) => ({
+        label,
+        value: m.total,
+        sub: m.total === m.paid ? `${m.paid} pagados` : `${m.paid} pagados · ${m.total - m.paid} por confirmar`,
+      }))
+      .sort((x, y) => y.value - x.value);
+    return { rows, units: rows.reduce((s, r) => s + r.value, 0), orders: scoped.length };
+  }, [orders, prodWin]);
+
+  const hasOrders = a.total > 0;
 
   return (
     <>
       <div className="astat">
         <div className="box accent">
+          <div className="k">Ingreso proyectado</div>
+          <div className="v tnum">{crc(a.proyectado)}</div>
+        </div>
+        <div className="box">
           <div className="k">Ingreso confirmado</div>
           <div className="v tnum">{crc(a.ingreso)}</div>
         </div>
         <div className="box">
-          <div className="k">Pedidos pagados</div>
-          <div className="v">{a.pagados}<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 400 }}> / {a.total}</span></div>
+          <div className="k">Por cobrar</div>
+          <div className="v tnum">{crc(a.porCobrar)}</div>
         </div>
         <div className="box">
-          <div className="k">Ticket promedio</div>
-          <div className="v tnum">{crc(a.ticket)}</div>
-        </div>
-        <div className="box">
-          <div className="k">Platos vendidos</div>
-          <div className="v">{a.platos}</div>
+          <div className="k">Tasa de pago</div>
+          <div className="v">{a.tasaPago}%<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 400 }}> · {a.pagados} / {a.total}</span></div>
         </div>
       </div>
 
       <div className="astat" style={{ marginTop: 12 }}>
         <div className="box">
-          <div className="k">Ingreso en platos</div>
+          <div className="k">Ticket promedio</div>
+          <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(a.ticket)}</div>
+        </div>
+        <div className="box">
+          <div className="k">Ingreso en platos (pagados)</div>
           <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(a.ingresoPlatos)}</div>
         </div>
         <div className="box">
-          <div className="k">Ingreso en Market</div>
+          <div className="k">Ingreso en Market (pagados)</div>
           <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(a.ingresoMarket)}</div>
         </div>
         <div className="box">
-          <div className="k">Ítems de Market</div>
-          <div className="v">{a.marketItems}</div>
-        </div>
-        <div className="box">
-          <div className="k">Pendientes por cobrar</div>
+          <div className="k">Pedidos pendientes</div>
           <div className="v">{a.pendientes}</div>
         </div>
       </div>
 
-      {!hasPaid ? (
+      {!hasOrders ? (
         <div className="otable" style={{ marginTop: 20 }}>
-          <div className="empty" style={{ padding: 20 }}>
-            Todavía no hay pedidos <b>pagados</b>. La analítica cuenta solo pedidos confirmados (pagados) para que
-            los números sean 100% reales.
-          </div>
+          <div className="empty" style={{ padding: 20 }}>Todavía no hay pedidos.</div>
         </div>
       ) : (
         <>
-          <div className="klabel" style={{ marginTop: 22 }}>Platos más vendidos</div>
+          <div className="aprod-head">
+            <div className="klabel" style={{ margin: 0 }}>Producción por plato</div>
+            <select
+              className="aprod-sel"
+              value={prodWin}
+              onChange={(e) => setProdWin(e.target.value)}
+              aria-label="Entrega"
+            >
+              <option value="all">Todas las entregas</option>
+              {a.prodWindows.map((w) => (
+                <option key={w.id} value={w.id}>{w.label.replace(/^Entrega\s+/i, "")}</option>
+              ))}
+            </select>
+          </div>
+          <p className="aprod-note">
+            {prod.units} platos a preparar en {prod.orders} pedidos — cuenta <b>pagados y pendientes</b>.
+          </p>
+          <RankBars rows={prod.rows} unit="ud" />
+
+          <div className="klabel" style={{ marginTop: 22 }}>Platos más vendidos (pagados)</div>
           <RankBars rows={a.topDishes} unit="ud" />
 
-          <div className="klabel">Sano Market más vendido</div>
+          <div className="klabel">Sano Market más vendido (pagados)</div>
           <RankBars rows={a.topMarket} unit="ud" />
 
           {a.comboDist.length > 0 && (
             <>
-              <div className="klabel">Tamaño de pedido</div>
+              <div className="klabel">Tamaño de pedido (pagados)</div>
               <RankBars rows={a.comboDist} unit="ped." />
             </>
           )}
 
-          <div className="klabel">Ingreso por entrega</div>
+          <div className="klabel">Ingreso confirmado por entrega</div>
           <div className="otable">
             <div className="orow head" style={{ gridTemplateColumns: "1.6fr auto auto" }}>
               <span>Entrega</span>
@@ -188,8 +239,9 @@ export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos:
       )}
 
       <p className="wa-note" style={{ textAlign: "left", marginTop: 12 }}>
-        Todos los números salen de los pedidos marcados como <b>pagados</b> — sin estimaciones. Se actualiza solo
-        cada 20 s.
+        <b>Proyectado</b> = todos los pedidos (pagados y pendientes). <b>Confirmado</b> = solo los marcados como
+        pagados. <b>Por cobrar</b> = la diferencia. El resto de las métricas cuentan solo pedidos pagados. Se
+        actualiza solo cada 20 s.
       </p>
     </>
   );

@@ -106,12 +106,30 @@ export function getCycleWindows(anchorISO?: string, now: Date = new Date()): Del
   return wins;
 }
 
-/** Entregas que el cliente puede elegir ahora: las del ciclo cuyo retiro no pasó. */
+/** Mensaje que ve el cliente cuando el sitio está pausado (sin ventanas abiertas). */
+export const ORDERS_PAUSED_TITLE = "Pedidos cerrados por ahora";
+export const ORDERS_PAUSED_MESSAGE = "Abrimos apenas publiquemos el nuevo menú 🍽️";
+
+/**
+ * Entregas en las que el cliente puede pedir ahora: las del ciclo del menú
+ * publicado cuyo CIERRE de pedidos (`cutoff`, no la entrega) todavía no pasó.
+ *
+ * Si el menú ya se publicó y todas las ventanas de su ciclo cerraron, devuelve
+ * vacío: el sitio queda **pausado** hasta que el dueño publique un menú nuevo
+ * (eso re-fija `menuPublishedAt` y abre la semana). No auto-avanza por reloj.
+ *
+ * Solo si nunca se publicó un menú (sin ancla) se usan las próximas ventanas
+ * por reloj, para que una instalación nueva no arranque pausada.
+ */
 export function getClientWindows(anchorISO?: string, now: Date = new Date()): DeliveryWindow[] {
-  const open = getCycleWindows(anchorISO, now).filter((w) => w.deliveryEnd.getTime() >= now.getTime());
-  return open.length
-    ? open
-    : getOfferedWindows(now).filter((w) => w.deliveryEnd.getTime() >= now.getTime());
+  const anchor = anchorISO ? new Date(anchorISO) : null;
+  if (!anchor || Number.isNaN(anchor.getTime())) return getOfferedWindows(now);
+  return getOfferedWindows(anchor).filter((w) => w.cutoff.getTime() > now.getTime());
+}
+
+/** true si no hay ninguna ventana abierta para pedir (ver `getClientWindows`). */
+export function isOrderingPaused(anchorISO?: string, now: Date = new Date()): boolean {
+  return getClientWindows(anchorISO, now).length === 0;
 }
 
 /** Todas las ventanas viernes/lunes en un rango (para reasignar pedidos a mano). Más reciente primero. */
