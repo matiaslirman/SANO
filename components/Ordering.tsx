@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { PublicStatus, MarketCategory, Order } from "@/lib/types";
 import { priceForDishes, comboLabel, nextCombo, savingsVsBase } from "@/lib/pricing";
 import { crc } from "@/lib/format";
+import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
@@ -144,8 +145,10 @@ export function Ordering({
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
-  const soldOut = selWin.cuposDisponibles <= 0;
-  const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !submitting;
+  // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
+  const paused = !isEvent && status.windows.length === 0;
+  const soldOut = !paused && selWin.cuposDisponibles <= 0;
+  const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !paused && !submitting;
 
   // ── suggested para el upsell (4 destacados) ──
   const suggested = useMemo(() => {
@@ -347,11 +350,13 @@ export function Ordering({
                   Platos de chef, listos para retirar. Elegí los tuyos y coordinás todo por WhatsApp en un
                   minuto.
                 </p>
-                <div className="hero-cta">
-                  <button className="btn-primary" onClick={scrollToMenu}>
-                    Pedir ahora →
-                  </button>
-                </div>
+                {!paused && (
+                  <div className="hero-cta">
+                    <button className="btn-primary" onClick={scrollToMenu}>
+                      Pedir ahora →
+                    </button>
+                  </div>
+                )}
                 <div className="trust">
                   <span className="ig">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -369,8 +374,19 @@ export function Ordering({
 
                 {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
                 <div className="hero-urgency" ref={heroPillRef}>
-                  {renderPill(true)}
-                  <span className="sr-only" role="timer">{cdA11y}</span>
+                  {paused ? (
+                    <span className="pill pill-paused">
+                      <span className="pill-blk">
+                        <span className="pill-lab">Pedidos</span>
+                        <span className="pill-val">Cerrados por ahora</span>
+                      </span>
+                    </span>
+                  ) : (
+                    <>
+                      {renderPill(true)}
+                      <span className="sr-only" role="timer">{cdA11y}</span>
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -435,6 +451,16 @@ export function Ordering({
             </div>
           )}
 
+          {paused && (
+            <div className="pause-card" id="menu" role="status">
+              <div className="pause-kick">Sano</div>
+              <h2 className="pause-title">{ORDERS_PAUSED_TITLE}</h2>
+              <p className="pause-text">{ORDERS_PAUSED_MESSAGE}</p>
+            </div>
+          )}
+
+          {!paused && (
+          <>
           {/* MENU */}
           <div className="sec-head" id="menu">
             <div>
@@ -677,11 +703,13 @@ export function Ordering({
               </>
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 
       {/* PILL de urgencia flotante — aparece cuando el pill del hero sale de vista */}
-      {!isEvent && (
+      {!isEvent && !paused && (
         <button
           type="button"
           className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
