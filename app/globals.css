@@ -352,3 +352,10 @@ footer .fbrand{margin-bottom:12px}
 .gate-err{margin-top:14px;background:#FBEAEA;border:1px solid #E7BDBD;color:#9a2020;border-radius:10px;padding:11px 13px;font-size:13.5px}
 .gate-back{margin-top:16px;display:inline-block;font-size:13px;color:var(--muted);text-decoration:none}
 .gate-back:hover{color:var(--bordo)}
+
+/* Pausa: pedidos cerrados hasta publicar un menú nuevo */
+.pill-paused{padding:11px 20px}
+.pause-card{margin:8px 0 40px;padding:36px 24px;text-align:center;background:#fff;border:1px solid var(--line-strong,#E7D7B4);border-radius:20px}
+.pause-kick{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted,#7a6a55)}
+.pause-title{font-family:var(--disp);font-size:clamp(1.7rem,5vw,2.4rem);line-height:1.1;text-transform:uppercase;color:var(--bordo);margin:8px 0 10px}
+.pause-text{font-size:1.05rem;color:var(--ink);margin:0}

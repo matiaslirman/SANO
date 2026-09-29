@@ -5,7 +5,7 @@ import os from "node:os";
 import { Redis } from "@upstash/redis";
 import type { Settings, MarketCategory, Order, OrderStatus, EventSettings, PublicStatus } from "./types";
 import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
-import { getNextWindow, getClientWindows, windowFromId } from "./windows";
+import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes } from "./pricing";
 
 const K = {
@@ -88,6 +88,14 @@ export interface NewOrderInput {
   windowId?: string; // entrega elegida por el cliente (una de las ofrecidas)
   dishes: { name: string; qty: number }[];
   market: { category: string; name: string; qty: number }[];
+}
+
+/** Se lanza al crear un pedido cuando el sitio está pausado (ver `getClientWindows`). */
+export class OrdersPausedError extends Error {
+  constructor() {
+    super(`${ORDERS_PAUSED_TITLE}. ${ORDERS_PAUSED_MESSAGE}`);
+    this.name = "OrdersPausedError";
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────
@@ -228,7 +236,9 @@ export const store = {
     // Ventana del ciclo actual (atado al menú). Respeta la elegida por el cliente
     // si sigue abierta; si no (ej. pedido tardío), cae en la del ciclo actual.
     const offered = getClientWindows(settings.menuPublishedAt);
-    const win = offered.find((w) => w.id === input.windowId) || offered[0] || getNextWindow();
+    // Pausado: cerraron todas las ventanas del menú y no se publicó uno nuevo.
+    if (offered.length === 0) throw new OrdersPausedError();
+    const win = offered.find((w) => w.id === input.windowId) || offered[0];
 
     // Dishes: only keep known menu items with qty > 0
     const dishes = (input.dishes || [])

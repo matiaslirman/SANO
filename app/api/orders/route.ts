@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { store, type NewOrderInput } from "@/lib/store";
+import { store, OrdersPausedError, type NewOrderInput } from "@/lib/store";
 import { isAdmin } from "@/lib/auth-server";
 import { EVENT_COOKIE, verifyEventToken } from "@/lib/event-auth";
 import { getCycleWindows, getNextWindow } from "@/lib/windows";
@@ -48,8 +48,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Falta el nombre" }, { status: 400 });
   }
 
-  const order = await store.createOrder(body);
-  return NextResponse.json({ order }, { status: 201 });
+  try {
+    const order = await store.createOrder(body);
+    return NextResponse.json({ order }, { status: 201 });
+  } catch (e) {
+    if (e instanceof OrdersPausedError) {
+      return NextResponse.json({ error: e.message, paused: true }, { status: 409 });
+    }
+    throw e;
+  }
 }
 
 /** Listar pedidos (solo admin). */
