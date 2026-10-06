@@ -42,6 +42,17 @@ export async function PATCH(req: Request) {
       .sort((a, b) => a.min - b.min);
   }
 
+  if (typeof body.proteinExtraPrice === "number" && body.proteinExtraPrice >= 0) {
+    patch.proteinExtraPrice = Math.min(1_000_000, Math.floor(body.proteinExtraPrice));
+  }
+  if (body.proteinExtraByDish && typeof body.proteinExtraByDish === "object") {
+    const by: Record<string, number> = {};
+    for (const [k, v] of Object.entries(body.proteinExtraByDish)) {
+      if (typeof v === "number" && v >= 0) by[String(k).slice(0, 120)] = Math.min(1_000_000, Math.floor(v));
+    }
+    patch.proteinExtraByDish = by;
+  }
+
   const settings = await store.saveSettings(patch);
   return NextResponse.json({ settings });
 }

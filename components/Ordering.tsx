@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { PublicStatus, MarketCategory, Order } from "@/lib/types";
-import { priceForDishes, comboLabel, nextCombo, savingsVsBase } from "@/lib/pricing";
+import { priceForDishes, comboLabel, nextCombo, savingsVsBase, PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
 import { crc } from "@/lib/format";
 import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
@@ -33,6 +33,10 @@ export function Ordering({
   const market = isEvent ? [] : initialMarket;
 
   const [dishQty, setDishQty] = useState<Record<string, number>>({});
+  // "Proteína Extra": cuántas unidades de cada plato llevan la porción agrandada (nunca más que el plato).
+  const [extraQty, setExtraQty] = useState<Record<string, number>>({});
+  const extraPrice = (dish: string) => (isEvent ? 0 : status.extraPrices?.[dish] || 0);
+  const extraOf = (dish: string) => (extraPrice(dish) > 0 ? Math.min(extraQty[dish] || 0, dishQty[dish] || 0) : 0);
   const [marketQty, setMarketQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
@@ -133,14 +137,26 @@ export function Ordering({
         }
       }
     }
+    let extrasTotal = 0;
+    let extrasQtyTotal = 0;
+    for (const dish of status.menu) {
+      const n = Math.min(extraQty[dish] || 0, dishQty[dish] || 0);
+      const unit = isEvent ? 0 : status.extraPrices?.[dish] || 0;
+      if (n > 0 && unit > 0) {
+        extrasTotal += n * unit;
+        extrasQtyTotal += n;
+      }
+    }
     return {
       dishesQty,
       dishesTotal,
+      extrasTotal,
+      extrasQtyTotal,
       marketTotal,
       marketCount,
-      grand: dishesTotal + marketTotal,
+      grand: dishesTotal + extrasTotal + marketTotal,
     };
-  }, [dishQty, marketQty, market, status.basePrice, status.combos]);
+  }, [dishQty, extraQty, marketQty, market, status.basePrice, status.combos, status.menu, status.extraPrices, isEvent]);
 
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
@@ -162,8 +178,17 @@ export function Ordering({
   }, [market]);
 
   // ── acciones ──
-  const stepDish = (dish: string, delta: number) =>
-    setDishQty((q) => ({ ...q, [dish]: Math.max(0, (q[dish] || 0) + delta) }));
+  const stepDish = (dish: string, delta: number) => {
+    const next = Math.max(0, (dishQty[dish] || 0) + delta);
+    setDishQty((q) => ({ ...q, [dish]: next }));
+    // si baja la cantidad, el extra nunca puede superar los platos
+    setExtraQty((e) => (e[dish] > next ? { ...e, [dish]: next } : e));
+  };
+  const stepExtra = (dish: string, delta: number) =>
+    setExtraQty((e) => ({
+      ...e,
+      [dish]: Math.max(0, Math.min(dishQty[dish] || 0, (e[dish] || 0) + delta)),
+    }));
   const stepMarket = (catId: string, item: string, delta: number) =>
     setMarketQty((q) => {
       const k = mkey(catId, item);
@@ -228,7 +253,10 @@ export function Ordering({
     if (order.dishes.length) {
       L.push("");
       L.push("*PLATOS LISTOS SANO*");
-      order.dishes.forEach((d) => L.push(`x${d.qty}  ${d.name}`));
+      order.dishes.forEach((d) => {
+        L.push(`x${d.qty}  ${d.name}`);
+        if (d.extraQty) L.push(`     ➕ ${d.extraQty} con ${PROTEIN_EXTRA_LABEL} (+${crc(d.extraQty * (d.extraUnit || 0))})`);
+      });
     }
     if (order.market.length) {
       L.push("");
@@ -246,6 +274,7 @@ export function Ordering({
           : `${order.dishesQty} platos ${crc(order.dishesTotal)}`
       );
     }
+    if (order.extrasTotal) parts.push(`${PROTEIN_EXTRA_LABEL} ${crc(order.extrasTotal)}`);
     if (order.marketTotal > 0) parts.push(`Market ${crc(order.marketTotal)}`);
     L.push(`*TOTAL: ${crc(order.total)}*`);
     if (parts.length > 1) L.push(`(${parts.join(" + ")})`);
@@ -274,7 +303,7 @@ export function Ordering({
         windowId: selWin.id,
         dishes: Object.entries(dishQty)
           .filter(([, q]) => q > 0)
-          .map(([n, q]) => ({ name: n, qty: q })),
+          .map(([n, q]) => ({ name: n, qty: q, extraQty: extraOf(n) || undefined })),
         market: isEvent
           ? []
           : market.flatMap((cat) =>
@@ -296,6 +325,7 @@ export function Ordering({
       else window.location.href = link;
       setCreated(order);
       setDishQty({});
+      setExtraQty({});
       setMarketQty({});
       refetchStatus();
     } catch (e) {
@@ -509,6 +539,36 @@ export function Ordering({
                       </button>
                     </div>
                   </div>
+                  {q > 0 && extraPrice(dish) > 0 && (
+                    <div className={`pextra${extraOf(dish) > 0 ? " on" : ""}`}>
+                      {extraOf(dish) === 0 ? (
+                        <button type="button" className="pextra-add" onClick={() => stepExtra(dish, 1)}>
+                          <span className="pextra-plus" aria-hidden="true">+</span>
+                          <span className="pextra-t">{PROTEIN_EXTRA_LABEL}</span>
+                          <span className="pextra-p tnum">+{crc(extraPrice(dish))}</span>
+                        </button>
+                      ) : (
+                        <>
+                          <span className="pextra-t">
+                            💪 {PROTEIN_EXTRA_LABEL}
+                            <span className="pextra-p tnum"> +{crc(extraPrice(dish))} c/u</span>
+                          </span>
+                          <div className="pextra-step" aria-label={`${PROTEIN_EXTRA_LABEL} en ${dish}`}>
+                            <button type="button" onClick={() => stepExtra(dish, -1)} aria-label={`Quitar ${PROTEIN_EXTRA_LABEL}`}>–</button>
+                            <span className="q tnum">{extraOf(dish)}</span>
+                            <button
+                              type="button"
+                              onClick={() => stepExtra(dish, 1)}
+                              disabled={extraOf(dish) >= q}
+                              aria-label={`Sumar ${PROTEIN_EXTRA_LABEL}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -627,7 +687,14 @@ export function Ordering({
                         return (
                           <div key={dish} className="cline">
                             <span className="qy">{q}×</span>
-                            <span className="nm">{dish}</span>
+                            <span className="nm">
+                              {dish}
+                              {extraOf(dish) > 0 && (
+                                <small className="cextra">
+                                  💪 {extraOf(dish)} con {PROTEIN_EXTRA_LABEL} · +{crc(extraOf(dish) * extraPrice(dish))}
+                                </small>
+                              )}
+                            </span>
                           </div>
                         );
                       })}
@@ -660,6 +727,12 @@ export function Ordering({
                         <span>Platos listos ({totals.dishesQty})</span>
                         <span className="tnum">{crc(totals.dishesTotal)}</span>
                       </div>
+                      {totals.extrasTotal > 0 && (
+                        <div className="trow">
+                          <span>{PROTEIN_EXTRA_LABEL} ({totals.extrasQtyTotal})</span>
+                          <span className="tnum">{crc(totals.extrasTotal)}</span>
+                        </div>
+                      )}
                       {totals.marketTotal > 0 && (
                         <div className="trow">
                           <span>Sano Market</span>

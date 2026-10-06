@@ -186,3 +186,6 @@
 .aprod-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px}
 .aprod-sel{border:1px solid var(--line-strong);background:#fff;color:var(--bordo-ink);border-radius:999px;padding:9px 15px;font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer;max-width:100%}
 .aprod-note{font-size:13px;color:var(--muted);margin:6px 0 4px}
+.etq-extra{display:block;font-size:.8em;font-weight:700;color:var(--bordo);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.edit-list input.er-extra{flex:0 0 110px;width:110px;text-align:right}
+@media(max-width:600px){.edit-list .er{flex-wrap:wrap}.edit-list input.er-extra{flex:0 0 96px;width:96px}}

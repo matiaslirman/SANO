@@ -359,3 +359,17 @@ footer .fbrand{margin-bottom:12px}
 .pause-kick{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted,#7a6a55)}
 .pause-title{font-family:var(--disp);font-size:clamp(1.7rem,5vw,2.4rem);line-height:1.1;text-transform:uppercase;color:var(--bordo);margin:8px 0 10px}
 .pause-text{font-size:1.05rem;color:var(--ink);margin:0}
+
+/* Proteína Extra: opcional, aparece solo cuando ya hay plato elegido */
+.pextra{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px dashed var(--line-strong);padding-top:11px;margin-top:-2px}
+.pextra-add{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);background:#fff;color:var(--bordo-ink);border-radius:999px;padding:7px 12px 7px 8px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s}
+.pextra-add:hover{border-color:var(--bordo);background:var(--crema-bg)}
+.pextra-plus{width:20px;height:20px;border-radius:50%;background:var(--bordo);color:var(--crema);display:grid;place-items:center;font-family:var(--disp);font-size:15px;line-height:1}
+.pextra-p{color:var(--muted);font-weight:500;font-size:12.5px}
+.pextra-t{font-size:13px;font-weight:600;color:var(--bordo-ink)}
+.pextra.on .pextra-t{color:var(--bordo)}
+.pextra-step{display:flex;align-items:center;background:#fff;border:1px solid var(--bordo);border-radius:999px;padding:2px}
+.pextra-step button{width:30px;height:30px;border:0;border-radius:50%;background:var(--crema-bg);color:var(--bordo);font-family:var(--disp);font-size:18px;font-weight:600;line-height:1;display:grid;place-items:center;cursor:pointer}
+.pextra-step button:disabled{opacity:.35;cursor:default}
+.pextra-step .q{min-width:26px;text-align:center;font-family:var(--disp);font-weight:600;color:var(--bordo)}
+.cextra{display:block;font-size:12px;color:var(--bordo);font-weight:600;margin-top:2px}

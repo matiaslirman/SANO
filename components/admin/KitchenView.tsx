@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
+import { PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
 import { WindowTabs, deriveWindows, pastPendingOrders, type WinOpt } from "./WindowTabs";
 
-type Kind = "dish" | "market";
+type Kind = "dish" | "market" | "extra";
 const itemKey = (kind: Kind, name: string) => `${kind}:${name}`;
 
 function aggregate(orders: Order[], onlyPaid: boolean) {
   const dishes: Record<string, number> = {};
   const market: Record<string, number> = {};
+  const extras: Record<string, number> = {};
   let dishTotal = 0;
   let marketTotal = 0;
   for (const o of orders) {
@@ -17,6 +19,7 @@ function aggregate(orders: Order[], onlyPaid: boolean) {
     for (const d of o.dishes) {
       dishes[d.name] = (dishes[d.name] || 0) + d.qty;
       dishTotal += d.qty;
+      if (d.extraQty) extras[d.name] = (extras[d.name] || 0) + d.extraQty;
     }
     for (const m of o.market) {
       market[m.name] = (market[m.name] || 0) + m.qty;
@@ -24,7 +27,7 @@ function aggregate(orders: Order[], onlyPaid: boolean) {
     }
   }
   const sort = (r: Record<string, number>) => Object.entries(r).sort((a, b) => b[1] - a[1]);
-  return { dishes: sort(dishes), market: sort(market), dishTotal, marketTotal };
+  return { dishes: sort(dishes), market: sort(market), extras: sort(extras), dishTotal, marketTotal };
 }
 
 function Bars({
@@ -175,6 +178,7 @@ export function KitchenView({
     rows.reduce((n, [name, qty]) => n + (isDone(itemKey(kind, name), qty) ? 1 : 0), 0);
   const dishDone = countDone(agg.dishes, "dish");
   const marketDone = countDone(agg.market, "market");
+  const extraDone = countDone(agg.extras, "extra");
 
   return (
     <>
@@ -229,6 +233,18 @@ export function KitchenView({
         )}
       </div>
       <Bars rows={agg.dishes} kind="dish" isDone={isDone} onToggle={toggle} />
+
+      {agg.extras.length > 0 && (
+        <>
+          <div className="klabel">
+            {PROTEIN_EXTRA_LABEL} — porción agrandada
+            <span className={`kprog${extraDone === agg.extras.length ? " all" : ""}`}>
+              {extraDone}/{agg.extras.length} listos
+            </span>
+          </div>
+          <Bars rows={agg.extras} kind="extra" isDone={isDone} onToggle={toggle} />
+        </>
+      )}
 
       <div className="klabel">
         Sano Market — a preparar

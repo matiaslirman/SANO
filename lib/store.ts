@@ -3,10 +3,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { Redis } from "@upstash/redis";
-import type { Settings, MarketCategory, Order, OrderStatus, EventSettings, PublicStatus } from "./types";
+import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus } from "./types";
 import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
-import { priceForDishes } from "./pricing";
+import { priceForDishes, resolveExtraPrices } from "./pricing";
 
 const K = {
   settings: "sano:settings",
@@ -86,7 +86,7 @@ export interface NewOrderInput {
   whatsapp?: string;
   notes?: string;
   windowId?: string; // entrega elegida por el cliente (una de las ofrecidas)
-  dishes: { name: string; qty: number }[];
+  dishes: { name: string; qty: number; extraQty?: number }[];
   market: { category: string; name: string; qty: number }[];
 }
 
@@ -241,11 +241,19 @@ export const store = {
     const win = offered.find((w) => w.id === input.windowId) || offered[0];
 
     // Dishes: only keep known menu items with qty > 0
-    const dishes = (input.dishes || [])
+    // "Proteína Extra": el precio lo fija el servidor; el cliente solo dice cuántas unidades.
+    const extraPrices = resolveExtraPrices(settings);
+    const dishes: OrderDishLine[] = (input.dishes || [])
       .filter((d) => d.qty > 0 && settings.menu.includes(d.name))
-      .map((d) => ({ name: d.name, qty: Math.floor(d.qty) }));
+      .map((d) => {
+        const qty = Math.floor(d.qty);
+        const unit = extraPrices[d.name] || 0;
+        const extraQty = unit > 0 ? Math.min(qty, Math.max(0, Math.floor(d.extraQty || 0))) : 0;
+        return extraQty > 0 ? { name: d.name, qty, extraQty, extraUnit: unit } : { name: d.name, qty };
+      });
     const dishesQty = dishes.reduce((s, d) => s + d.qty, 0);
     const dishesTotal = priceForDishes(dishesQty, settings.basePrice, settings.combos);
+    const extrasTotal = dishes.reduce((s, d) => s + (d.extraQty || 0) * (d.extraUnit || 0), 0);
 
     // Market: resolve unit price from the catalog (server authoritative)
     const marketLines = [];
@@ -280,7 +288,8 @@ export const store = {
       dishesQty,
       dishesTotal,
       marketTotal,
-      total: dishesTotal + marketTotal,
+      ...(extrasTotal > 0 ? { extrasTotal } : {}),
+      total: dishesTotal + extrasTotal + marketTotal,
       status: "pendiente",
       completed: false,
     };

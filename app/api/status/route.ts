@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { getClientWindows } from "@/lib/windows";
+import { resolveExtraPrices } from "@/lib/pricing";
 import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ export async function GET() {
     basePrice: settings.basePrice,
     combos: settings.combos,
     windows,
+    extraPrices: resolveExtraPrices(settings),
   };
   return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });
 }

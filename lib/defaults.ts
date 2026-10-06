@@ -18,6 +18,9 @@ export const DEFAULT_SETTINGS: Settings = {
     { min: 10, price: 51000 },
     { min: 15, price: 75500 },
   ],
+  // "Proteína Extra" arranca desactivada: se enciende poniendo un precio en Contenido.
+  proteinExtraPrice: 0,
+  proteinExtraByDish: {},
 };
 
 export const DEFAULT_MARKET: MarketCategory[] = [

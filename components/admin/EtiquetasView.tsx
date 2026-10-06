@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
+import { PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
 import type { WinOpt } from "./WindowTabs";
 import { DaySelect, type DayOpt } from "./DaySelect";
 
@@ -132,7 +133,15 @@ export function EtiquetasView({ initial }: { initial: Data }) {
                           <input type="checkbox" checked={on} onChange={() => toggle(o, d)} />
                           <span className="etq-box" aria-hidden="true">{on ? "✓" : ""}</span>
                           <span className="etq-qty tnum">{d.qty}×</span>
-                          <span className="etq-dish">{d.name}</span>
+                          <span className="etq-dish">
+                            {d.name}
+                            {d.extraQty ? (
+                              <span className="etq-extra">
+                                💪 {PROTEIN_EXTRA_LABEL}
+                                {d.extraQty < d.qty ? ` ×${d.extraQty}` : ""}
+                              </span>
+                            ) : null}
+                          </span>
                         </label>
                       </li>
                     );

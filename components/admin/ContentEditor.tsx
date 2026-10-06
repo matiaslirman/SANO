@@ -23,6 +23,18 @@ export function ContentEditor({
   const [savedMenu, setSavedMenu] = useState(false);
   const [busyMenu, setBusyMenu] = useState(false);
 
+  // ── Proteína Extra ──
+  const [extraPrice, setExtraPrice] = useState<number>(initialSettings.proteinExtraPrice || 0);
+  // precio propio por plato, en paralelo a `menu` ("" = usa el general, "0" = ese plato no lo ofrece)
+  const [menuExtra, setMenuExtra] = useState<string[]>(
+    initialSettings.menu.map((d) => {
+      const v = initialSettings.proteinExtraByDish?.[d];
+      return typeof v === "number" ? String(v) : "";
+    })
+  );
+  const [savedExtra, setSavedExtra] = useState(false);
+  const [busyExtra, setBusyExtra] = useState(false);
+
   // ── Cupos ──
   const [cupos, setCupos] = useState(initialSettings.cuposTotales);
   const [savedCupos, setSavedCupos] = useState(false);
@@ -63,10 +75,29 @@ export function ContentEditor({
   async function saveMenu() {
     setBusyMenu(true);
     try {
-      await patchSettings({ menu: menu.map((m) => m.trim()).filter(Boolean), weekLabel });
+      const byDish: Record<string, number> = {};
+      menu.forEach((m, i) => {
+        const name = m.trim();
+        const raw = (menuExtra[i] ?? "").trim();
+        if (name && raw !== "" && Number.isFinite(Number(raw)) && Number(raw) >= 0) byDish[name] = Math.floor(Number(raw));
+      });
+      await patchSettings({
+        menu: menu.map((m) => m.trim()).filter(Boolean),
+        weekLabel,
+        proteinExtraByDish: byDish,
+      });
       flash(setSavedMenu);
     } finally {
       setBusyMenu(false);
+    }
+  }
+  async function saveExtra() {
+    setBusyExtra(true);
+    try {
+      await patchSettings({ proteinExtraPrice: Math.max(0, Math.floor(extraPrice || 0)) });
+      flash(setSavedExtra);
+    } finally {
+      setBusyExtra(false);
     }
   }
   async function saveCupos() {
@@ -147,13 +178,34 @@ export function ContentEditor({
                 value={dish}
                 onChange={(e) => setMenu((m) => m.map((x, j) => (j === i ? e.target.value : x)))}
               />
-              <button className="obtn" onClick={() => setMenu((m) => m.filter((_, j) => j !== i))}>
+              <input
+                className="er-extra"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={menuExtra[i] ?? ""}
+                onChange={(e) => setMenuExtra((x) => x.map((v, j) => (j === i ? e.target.value : v)))}
+                placeholder={extraPrice > 0 ? `₡${extraPrice}` : "Extra ₡"}
+                title="Precio de Proteína Extra para este plato. Vacío = precio general; 0 = este plato no la ofrece."
+                aria-label={`Precio de Proteína Extra para ${dish || "este plato"}`}
+              />
+              <button
+                className="obtn"
+                onClick={() => {
+                  setMenu((m) => m.filter((_, j) => j !== i));
+                  setMenuExtra((x) => x.filter((_, j) => j !== i));
+                }}
+              >
                 Quitar
               </button>
             </div>
           ))}
         </div>
-        <button className="obtn" style={{ marginTop: 12 }} onClick={() => setMenu((m) => [...m, ""])}>
+        <div className="sub" style={{ marginTop: 10, marginBottom: 0 }}>
+          La columna de la derecha es el precio de <b>Proteína Extra</b> de cada plato (opcional): vacío usa el
+          precio general, <b>0</b> desactiva el extra en ese plato.
+        </div>
+        <button className="obtn" style={{ marginTop: 12 }} onClick={() => { setMenu((m) => [...m, ""]); setMenuExtra((x) => [...x, ""]); }}>
           + Agregar plato
         </button>
         <div>
@@ -161,6 +213,34 @@ export function ContentEditor({
             {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
           </button>
           <Saved show={savedMenu} />
+        </div>
+      </div>
+
+      {/* PROTEÍNA EXTRA */}
+      <div className="editcard">
+        <h3>Proteína Extra</h3>
+        <div className="sub">
+          Permite al cliente agrandar la porción de proteína de un plato por un precio adicional. Este es el{" "}
+          <b>precio general por plato</b>; en el menú podés poner uno distinto para cada plato. No cuenta para los
+          combos. <b>{extraPrice > 0 ? "Activada." : "Desactivada (precio en 0): los clientes no la ven."}</b>
+        </div>
+        <div className="cupos-edit">
+          <div className="field">
+            <label>Precio extra por plato (₡)</label>
+            <input
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={extraPrice}
+              onChange={(e) => setExtraPrice(parseInt(e.target.value) || 0)}
+            />
+          </div>
+        </div>
+        <div>
+          <button className="save-btn" onClick={saveExtra} disabled={busyExtra}>
+            {busyExtra ? "Guardando…" : "Guardar Proteína Extra"}
+          </button>
+          <Saved show={savedExtra} />
         </div>
       </div>
 
