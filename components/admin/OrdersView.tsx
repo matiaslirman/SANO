@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
+import { PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
 import type { WinOpt } from "./WindowTabs";
 import { DaySelect, type DayOpt } from "./DaySelect";
 
@@ -25,7 +26,9 @@ const fmtDate = (iso: string) =>
   });
 
 function itemsSummary(o: Order): string {
-  const parts = o.dishes.map((d) => `${d.qty}× ${d.name}`);
+  const parts = o.dishes.map(
+    (d) => `${d.qty}× ${d.name}${d.extraQty ? ` (💪 ${d.extraQty} ${PROTEIN_EXTRA_LABEL})` : ""}`
+  );
   o.market.forEach((m) => parts.push(`${m.qty}× ${m.name}`));
   return parts.join(" · ");
 }

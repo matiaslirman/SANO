@@ -21,6 +21,10 @@ export interface Settings {
   basePrice: number;       // CRC per dish (no combo)
   combos: ComboTier[];     // volume combo tiers
   menuPublishedAt?: string; // ISO: cuándo se publicó el menú → ancla del ciclo de entregas
+  /** "Proteína Extra": precio por defecto de agrandar la proteína de un plato (CRC). 0 = desactivado. */
+  proteinExtraPrice?: number;
+  /** Precio propio por plato (clave = nombre del plato). 0 = ese plato no ofrece el extra. Sin clave = precio por defecto. */
+  proteinExtraByDish?: Record<string, number>;
 }
 
 /**
@@ -44,6 +48,8 @@ export type OrderStatus = "pendiente" | "pagado";
 export interface OrderDishLine {
   name: string;
   qty: number;
+  extraQty?: number;  // cuántas de las `qty` unidades llevan "Proteína Extra"
+  extraUnit?: number; // precio unitario del extra al momento del pedido
 }
 
 export interface OrderMarketLine {
@@ -68,6 +74,7 @@ export interface Order {
   dishesQty: number;
   dishesTotal: number;
   marketTotal: number;
+  extrasTotal?: number; // suma de "Proteína Extra" (se suma al total; no cuenta para el combo)
   total: number;
   status: OrderStatus;
   completed?: boolean; // "tachado" — entregado/completado por el dueño
@@ -89,4 +96,6 @@ export interface PublicStatus {
   basePrice: number;
   combos: ComboTier[];
   windows: WindowInfo[];     // entregas ofrecidas (próximo viernes + próximo lunes)
+  /** Proteína Extra: precio por plato del menú actual. Sin clave o 0 = no disponible. Ausente en el evento. */
+  extraPrices?: Record<DishName, number>;
 }

@@ -1,4 +1,24 @@
-import type { ComboTier } from "./types";
+import type { ComboTier, Settings } from "./types";
+
+/** Nombre del extra de porción de proteína (público deportista). */
+export const PROTEIN_EXTRA_LABEL = "Proteína Extra";
+
+/**
+ * Precio de "Proteína Extra" por plato del menú actual. Cada plato usa su precio
+ * propio si lo tiene; si no, el general. 0 = ese plato no ofrece el extra.
+ */
+export function resolveExtraPrices(
+  s: Pick<Settings, "menu" | "proteinExtraPrice" | "proteinExtraByDish">
+): Record<string, number> {
+  const base = Math.max(0, Math.floor(s.proteinExtraPrice || 0));
+  const by = s.proteinExtraByDish || {};
+  const out: Record<string, number> = {};
+  for (const dish of s.menu) {
+    const own = by[dish];
+    out[dish] = typeof own === "number" && own >= 0 ? Math.floor(own) : base;
+  }
+  return out;
+}
 
 /**
  * Precio de los Platos Listos según la cantidad TOTAL de unidades

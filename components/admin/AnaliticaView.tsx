@@ -54,7 +54,7 @@ export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos:
   const a = useMemo(() => {
     const paid = orders.filter((o) => o.status === "pagado");
     const ingreso = paid.reduce((s, o) => s + o.total, 0);
-    const ingresoPlatos = paid.reduce((s, o) => s + o.dishesTotal, 0);
+    const ingresoPlatos = paid.reduce((s, o) => s + o.dishesTotal + (o.extrasTotal || 0), 0);
     const ingresoMarket = paid.reduce((s, o) => s + o.marketTotal, 0);
     const platos = paid.reduce((s, o) => s + o.dishesQty, 0);
     const marketItems = paid.reduce((s, o) => s + o.market.reduce((x, m) => x + m.qty, 0), 0);

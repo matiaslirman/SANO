@@ -3,6 +3,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Ordering } from "@/components/Ordering";
 import { store } from "@/lib/store";
 import { getClientWindows } from "@/lib/windows";
+import { resolveExtraPrices } from "@/lib/pricing";
 import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function Home() {
     basePrice: settings.basePrice,
     combos: settings.combos,
     windows,
+    extraPrices: resolveExtraPrices(settings),
   };
 
   return (
