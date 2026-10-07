@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order } from "@/lib/types";
 import { PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
-import { WindowTabs, deriveWindows, pastPendingOrders, type WinOpt } from "./WindowTabs";
+import { deriveWindows, pastPendingOrders, type WinOpt } from "./WindowTabs";
+import { DaySelect, type DayOpt } from "./DaySelect";
 
 type Kind = "dish" | "market" | "extra";
 const itemKey = (kind: Kind, name: string) => `${kind}:${name}`;
+const shortWin = (label: string) => label.replace(/^Entrega\s+/i, "");
 
 function aggregate(orders: Order[], onlyPaid: boolean) {
   const dishes: Record<string, number> = {};
@@ -164,6 +166,17 @@ export function KitchenView({
   );
 
   const windows = useMemo(() => deriveWindows(orders, activeWin), [orders, activeWin]);
+  // Opciones del dropdown: la ventana actual marcada y, entre paréntesis, los
+  // pedidos de esa entrega que todavía no están completados.
+  const dayOptions: DayOpt[] = useMemo(
+    () =>
+      windows.map((w) => ({
+        id: w.id,
+        label: shortWin(w.label) + (w.id === activeWin.id ? " · actual" : ""),
+        badge: orders.filter((o) => o.windowId === w.id && !o.completed).length,
+      })),
+    [windows, activeWin.id, orders]
+  );
   const selLabel = windows.find((w) => w.id === selWin)?.label || activeWin.label;
   const windowOrders = useMemo(() => orders.filter((o) => o.windowId === selWin), [orders, selWin]);
   const agg = useMemo(() => aggregate(windowOrders, onlyPaid), [windowOrders, onlyPaid]);
@@ -194,7 +207,7 @@ export function KitchenView({
         </div>
       )}
 
-      <WindowTabs windows={windows} selected={selWin} activeId={activeWin.id} onSelect={setSelWin} />
+      <DaySelect options={dayOptions} value={selWin} onChange={setSelWin} />
 
       <div className="astat">
         <div className="box">

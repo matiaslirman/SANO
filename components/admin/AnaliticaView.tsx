@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Order, ComboTier } from "@/lib/types";
+import type { Order, ComboTier, MonthlyIncome } from "@/lib/types";
 import { crc } from "@/lib/format";
 
 function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: string }[]; unit?: string }) {
@@ -31,10 +31,33 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
   );
 }
 
-export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos: ComboTier[] } }) {
+export function AnaliticaView({
+  initial,
+}: {
+  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[] };
+}) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const combos = initial.combos;
+  const history = initial.history;
   const [prodWin, setProdWin] = useState<string>("all");
+
+  // Histórico del negocio: consolidado mensual que mantiene el dueño en Contenido.
+  const hist = useMemo(() => {
+    const asc = [...history].sort((a, b) => a.month.localeCompare(b.month));
+    if (asc.length === 0) return { total: 0, avg: 0, best: null, last: null, rows: [] as (MonthlyIncome & { delta: number | null })[] };
+    const total = asc.reduce((s, h) => s + h.amount, 0);
+    const avg = Math.round(total / asc.length);
+    const best = asc.reduce((m, h) => (h.amount > m.amount ? h : m), asc[0]);
+    const last = asc[asc.length - 1];
+    const rows = asc
+      .map((h, i) => {
+        const prev = i > 0 ? asc[i - 1].amount : 0;
+        const delta = i > 0 && prev > 0 ? Math.round(((h.amount - prev) / prev) * 100) : null;
+        return { ...h, delta };
+      })
+      .reverse(); // más reciente primero
+    return { total, avg, best, last, rows };
+  }, [history]);
 
   const refetch = useCallback(async () => {
     try {
@@ -181,6 +204,61 @@ export function AnaliticaView({ initial }: { initial: { orders: Order[]; combos:
           <div className="v">{a.pendientes}</div>
         </div>
       </div>
+
+      {hist.rows.length > 0 && hist.best && hist.last && (
+        <>
+          <div className="klabel" style={{ marginTop: 24 }}>
+            Ingreso histórico del negocio
+            <span className="kprog">{hist.rows.length} meses</span>
+          </div>
+          <div className="astat" style={{ marginTop: 0 }}>
+            <div className="box accent">
+              <div className="k">Total global</div>
+              <div className="v tnum">{crc(hist.total)}</div>
+            </div>
+            <div className="box">
+              <div className="k">Promedio mensual</div>
+              <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(hist.avg)}</div>
+            </div>
+            <div className="box">
+              <div className="k">Mejor mes</div>
+              <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(hist.best.amount)}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{hist.best.label}</div>
+            </div>
+            <div className="box">
+              <div className="k">Último mes</div>
+              <div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(hist.last.amount)}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{hist.last.label}</div>
+            </div>
+          </div>
+          <div className="otable" style={{ marginTop: 14 }}>
+            <div className="orow head" style={{ gridTemplateColumns: "1.6fr auto auto" }}>
+              <span>Mes</span>
+              <span>Ingreso</span>
+              <span>vs. mes anterior</span>
+            </div>
+            {hist.rows.map((r) => (
+              <div className="orow" key={r.month} style={{ gridTemplateColumns: "1.6fr auto auto" }}>
+                <span className="oname">{r.label}</span>
+                <span className="ototal tnum">{crc(r.amount)}</span>
+                <span
+                  className="tnum"
+                  style={{
+                    color: r.delta === null ? "var(--muted)" : r.delta > 0 ? "var(--ok)" : r.delta < 0 ? "var(--bordo)" : "var(--muted)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {r.delta === null ? "—" : `${r.delta > 0 ? "+" : ""}${r.delta}%`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="wa-note" style={{ textAlign: "left", marginTop: 10 }}>
+            Consolidado mensual del negocio, editable en <b>Contenido</b>. El mes en curso ya incluye lo que
+            registró la plataforma, por eso el <b>Total global</b> no vuelve a sumarle los pedidos de arriba.
+          </p>
+        </>
+      )}
 
       {!hasOrders ? (
         <div className="otable" style={{ marginTop: 20 }}>

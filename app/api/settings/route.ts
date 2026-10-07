@@ -53,6 +53,20 @@ export async function PATCH(req: Request) {
     patch.proteinExtraByDish = by;
   }
 
+  // Ingreso histórico mensual (lo mantiene el dueño; el mes en curso ya incluye
+  // lo registrado por la plataforma, por eso se guarda tal cual lo escribe).
+  if (Array.isArray(body.history)) {
+    patch.history = body.history
+      .filter((h) => h && typeof h.month === "string" && typeof h.amount === "number" && h.amount >= 0)
+      .map((h) => ({
+        month: String(h.month).slice(0, 7).trim(),
+        label: String(h.label || h.month).slice(0, 40).trim(),
+        amount: Math.min(1_000_000_000, Math.floor(h.amount)),
+      }))
+      .filter((h) => /^\d{4}-\d{2}$/.test(h.month))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   const settings = await store.saveSettings(patch);
   return NextResponse.json({ settings });
 }

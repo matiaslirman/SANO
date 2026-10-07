@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Settings, MarketCategory, ComboTier, EventSettings } from "@/lib/types";
+import type { Settings, MarketCategory, ComboTier, EventSettings, MonthlyIncome } from "@/lib/types";
+import { crc } from "@/lib/format";
 
 function Saved({ show }: { show: boolean }) {
   if (!show) return null;
@@ -55,6 +56,12 @@ export function ContentEditor({
   const [ev, setEv] = useState<EventSettings>(initialEvent);
   const [savedEvent, setSavedEvent] = useState(false);
   const [busyEvent, setBusyEvent] = useState(false);
+
+  // ── Ingreso histórico ──
+  const [hist, setHist] = useState<MonthlyIncome[]>(initialSettings.history || []);
+  const [savedHist, setSavedHist] = useState(false);
+  const [busyHist, setBusyHist] = useState(false);
+  const histTotal = hist.reduce((s, h) => s + (h.amount || 0), 0);
   const setEvField = <K extends keyof EventSettings>(k: K, v: EventSettings[K]) =>
     setEv((e) => ({ ...e, [k]: v }));
 
@@ -98,6 +105,24 @@ export function ContentEditor({
       flash(setSavedExtra);
     } finally {
       setBusyExtra(false);
+    }
+  }
+  async function saveHist() {
+    setBusyHist(true);
+    try {
+      const clean = hist
+        .map((h) => ({
+          month: h.month.trim(),
+          label: (h.label || h.month).trim(),
+          amount: Math.max(0, Math.floor(h.amount || 0)),
+        }))
+        .filter((h) => /^\d{4}-\d{2}$/.test(h.month))
+        .sort((a, b) => a.month.localeCompare(b.month));
+      const s = await patchSettings({ history: clean });
+      setHist(s.history || clean);
+      flash(setSavedHist);
+    } finally {
+      setBusyHist(false);
     }
   }
   async function saveCupos() {
@@ -437,6 +462,69 @@ export function ContentEditor({
             {busyMarket ? "Guardando…" : "Guardar Sano Market"}
           </button>
           <Saved show={savedMarket} />
+        </div>
+      </div>
+
+      {/* INGRESO HISTÓRICO */}
+      <div className="editcard">
+        <h3>Ingreso histórico</h3>
+        <div className="sub">
+          Consolidado mensual del negocio que se ve en <b>Analítica</b> como <b>Total global</b>. El mes en
+          curso lo actualizás vos acá: ya incluye lo que registró la plataforma, así que el total no vuelve a
+          sumar los pedidos del sitio (no se duplica).
+        </div>
+
+        <div className="edit-list">
+          {hist.map((h, i) => (
+            <div className="er" key={`${h.month}-${i}`}>
+              <input
+                value={h.label}
+                onChange={(e) => setHist((s) => s.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                placeholder="Septiembre 2026"
+                aria-label="Mes"
+              />
+              <input
+                value={h.month}
+                onChange={(e) => setHist((s) => s.map((x, j) => (j === i ? { ...x, month: e.target.value } : x)))}
+                placeholder="2026-09"
+                style={{ maxWidth: 110 }}
+                aria-label="Clave del mes (AAAA-MM)"
+              />
+              <input
+                type="number"
+                min={0}
+                value={h.amount}
+                onChange={(e) =>
+                  setHist((s) => s.map((x, j) => (j === i ? { ...x, amount: parseInt(e.target.value) || 0 } : x)))
+                }
+                style={{ maxWidth: 140 }}
+                aria-label="Ingreso del mes"
+              />
+              <button className="obtn" onClick={() => setHist((s) => s.filter((_, j) => j !== i))}>
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          className="obtn"
+          style={{ marginTop: 12 }}
+          onClick={() => setHist((s) => [...s, { month: "", label: "", amount: 0 }])}
+        >
+          + Agregar mes
+        </button>
+
+        <div className="ev-hint">
+          Total global: <b>{crc(histTotal)}</b> · {hist.length} meses. La clave <b>AAAA-MM</b> ordena la tabla;
+          los meses sin esa forma se descartan al guardar.
+        </div>
+
+        <div>
+          <button className="save-btn" onClick={saveHist} disabled={busyHist}>
+            {busyHist ? "Guardando…" : "Guardar histórico"}
+          </button>
+          <Saved show={savedHist} />
         </div>
       </div>
     </>

@@ -1,4 +1,26 @@
-import type { Settings, MarketCategory, EventSettings } from "./types";
+import type { Settings, MarketCategory, EventSettings, MonthlyIncome } from "./types";
+
+/**
+ * Ingreso histórico del negocio (hoja "SANO MONTHLY REPORT"), sep-2025 → oct-2026.
+ * El mes en curso lo mantiene el dueño desde Contenido: ya refleja lo que registró
+ * la plataforma, así que el Total global NO vuelve a sumarle los pedidos del sitio.
+ */
+export const DEFAULT_HISTORY: MonthlyIncome[] = [
+  { month: "2025-09", label: "Septiembre 2025", amount: 248000 },
+  { month: "2025-10", label: "Octubre 2025", amount: 743500 },
+  { month: "2025-11", label: "Noviembre 2025", amount: 889000 },
+  { month: "2025-12", label: "Diciembre 2025", amount: 433500 },
+  { month: "2026-01", label: "Enero 2026", amount: 807750 },
+  { month: "2026-02", label: "Febrero 2026", amount: 404750 },
+  { month: "2026-03", label: "Marzo 2026", amount: 487750 },
+  { month: "2026-04", label: "Abril 2026", amount: 899000 },
+  { month: "2026-05", label: "Mayo 2026", amount: 578000 },
+  { month: "2026-06", label: "Junio 2026", amount: 525500 },
+  { month: "2026-07", label: "Julio 2026", amount: 268000 },
+  { month: "2026-08", label: "Agosto 2026", amount: 609000 },
+  { month: "2026-09", label: "Septiembre 2026", amount: 1116500 },
+  { month: "2026-10", label: "Octubre 2026", amount: 93000 },
+];
 
 export const DEFAULT_SETTINGS: Settings = {
   menu: [
@@ -21,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // "Proteína Extra" arranca desactivada: se enciende poniendo un precio en Contenido.
   proteinExtraPrice: 0,
   proteinExtraByDish: {},
+  history: DEFAULT_HISTORY,
 };
 
 export const DEFAULT_MARKET: MarketCategory[] = [
