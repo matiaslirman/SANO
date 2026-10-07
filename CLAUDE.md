@@ -16,6 +16,9 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   y `public/brand/*.svg`. Paleta: bordó `#921A1B`, crema `#FFF1B4` (tokens en `app/globals.css`).
 - **Nunca inventar datos.** Las métricas y los cupos salen de pedidos reales.
 - Español rioplatense/tico con voseo ("Elegí", "Sumá") en toda la UI.
+- **El diseño actual se queda.** En octubre 2026 se prototipó el rediseño tipográfico que propone
+  la skill `sano-visual-redesign` y el dueño lo descartó. No volver a proponerlo ni cargar esa
+  skill: los cambios de UI van sobre el diseño que ya está.
 
 ## Arquitectura
 - `app/page.tsx` — landing pública. Renderiza `components/Ordering.tsx`.
@@ -92,16 +95,6 @@ menú y abre el ciclo) → `POST /api/orders`.
 - La lámina crema (`.sheet`) se monta sobre el hero con `margin-top` negativo para que las
   esquinas redondeadas caigan sobre el bordó oscuro (sin franja clara). No romper eso.
 - Estilos públicos en `app/globals.css`; panel en `app/admin/admin.css`.
-
-## Próximo paso: rediseño visual
-Hay una skill del proyecto, **`sano-visual-redesign`** — **cargarla antes de tocar cualquier UI**.
-Propone que el sitio se sienta como el menú impreso de un bistró y no como una landing genérica:
-serif en sentence case para los platos, listas con línea fina en vez de tarjetas, menos cajas,
-sin eyebrows ni emojis, precios por paquete una sola vez.
-
-**Decidido con el dueño:** se hace **sin fotos de producto todavía** → usar el layout
-**tipográfico** de menú que la propia skill indica para ese caso (nada de stock ni imágenes
-generadas). Va en su propia rama, con preview lado a lado antes de decidir.
 
 ## Pendientes del dueño (no son código)
 - Renumerar el pedido de Diego (tocar el N° en Pedidos → 222).
