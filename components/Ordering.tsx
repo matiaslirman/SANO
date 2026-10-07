@@ -39,6 +39,7 @@ export function Ordering({
   const extraOf = (dish: string) => (extraPrice(dish) > 0 ? Math.min(extraQty[dish] || 0, dishQty[dish] || 0) : 0);
   const [marketQty, setMarketQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -299,6 +300,7 @@ export function Ordering({
       const payload = {
         event: isEvent || undefined,
         customerName: name.trim(),
+        whatsapp: phone.trim(),
         notes: notes.trim(),
         windowId: selWin.id,
         dishes: Object.entries(dishQty)
@@ -339,6 +341,7 @@ export function Ordering({
   function newOrder() {
     setCreated(null);
     setName("");
+    setPhone("");
     setNotes("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -649,6 +652,19 @@ export function Ordering({
                   <div className="field">
                     <label htmlFor="nm">Nombre y apellido</label>
                     <input id="nm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: María Fernández" />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="wa">WhatsApp <span style={{ textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+                    <input
+                      id="wa"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Ej: 8319 3498"
+                    />
+                    <div className="hint">Para avisarte si queda algo pendiente de tu pedido.</div>
                   </div>
                   <div className="field">
                     <label htmlFor="nt">Restricciones o ajustes menores</label>

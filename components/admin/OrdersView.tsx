@@ -17,6 +17,26 @@ interface Data {
 
 const shortWinLabel = (label: string) => label.replace(/^Entrega\s+/i, "");
 
+/** Teléfono del cliente en formato wa.me. Un número tico de 8 dígitos lleva 506 adelante. */
+function waNumber(raw: string | undefined): string {
+  const d = (raw || "").replace(/\D/g, "");
+  if (d.length === 8) return `506${d}`;
+  return d.length >= 10 ? d : "";
+}
+
+/** Link de WhatsApp con el recordatorio de pago ya escrito. */
+function reminderLink(o: Order): string {
+  const num = waNumber(o.whatsapp);
+  if (!num) return "";
+  const first = (o.customerName || "").trim().split(/\s+/)[0] || "";
+  const msg = [
+    `¡Hola ${first}! Te escribimos de SANO.`,
+    `Tu pedido ${o.id} (${shortWinLabel(o.windowLabel)}) quedó reservado por ${crc(o.total)}.`,
+    `Nos falta confirmar el pago para dejarlo listo — lo coordinamos por acá cuando puedas. ¡Gracias!`,
+  ].join("\n");
+  return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`;
+}
+
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("es-CR", {
     day: "2-digit",
@@ -266,6 +286,17 @@ export function OrdersView({ initial }: { initial: Data }) {
                 <span className={`pill ${o.completed ? "done" : o.status === "pagado" ? "paid" : "pend"}`}>
                   {o.completed ? "Completado" : o.status === "pagado" ? "Pagado" : "Pendiente"}
                 </span>
+                {o.status !== "pagado" && !!waNumber(o.whatsapp) && (
+                  <a
+                    className="obtn remind"
+                    href={reminderLink(o)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Recordar el pago por WhatsApp a ${o.whatsapp}`}
+                  >
+                    Recordar pago
+                  </a>
+                )}
                 <button className={`obtn ${o.status === "pagado" ? "paid" : ""}`} onClick={() => togglePaid(o)} disabled={busyId === o.id}>
                   {busyId === o.id ? "…" : o.status === "pagado" ? "Deshacer pago" : "Marcar pagado"}
                 </button>

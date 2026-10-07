@@ -14,6 +14,17 @@ export interface ComboTier {
   price: number; // total price at exactly `min` dishes
 }
 
+/**
+ * Ingreso mensual histórico del negocio. Lo mantiene el dueño desde Contenido:
+ * es el consolidado real (incluye el mes en curso con lo que ya registró la
+ * plataforma), así que NO se le vuelven a sumar los pedidos del sitio encima.
+ */
+export interface MonthlyIncome {
+  month: string;  // "YYYY-MM"
+  label: string;  // "Septiembre 2025"
+  amount: number; // CRC
+}
+
 export interface Settings {
   menu: DishName[];        // 7 (or N) weekly dishes
   weekLabel: string;       // e.g. "Semana del 15 al 21 sep"
@@ -25,6 +36,8 @@ export interface Settings {
   proteinExtraPrice?: number;
   /** Precio propio por plato (clave = nombre del plato). 0 = ese plato no ofrece el extra. Sin clave = precio por defecto. */
   proteinExtraByDish?: Record<string, number>;
+  /** Ingreso histórico mensual del negocio (editable en Contenido). */
+  history?: MonthlyIncome[];
 }
 
 /**

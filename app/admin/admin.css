@@ -189,3 +189,7 @@
 .etq-extra{display:block;font-size:.8em;font-weight:700;color:var(--bordo);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
 .edit-list input.er-extra{flex:0 0 110px;width:110px;text-align:right}
 @media(max-width:600px){.edit-list .er{flex-wrap:wrap}.edit-list input.er-extra{flex:0 0 96px;width:96px}}
+
+/* recordatorio de pago por WhatsApp (link con forma de botón) */
+.obtn.remind{display:inline-flex;align-items:center;text-decoration:none;border-color:var(--ok);color:var(--ok)}
+.obtn.remind:hover{background:#EAF4EC;border-color:var(--ok)}

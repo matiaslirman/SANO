@@ -16,7 +16,7 @@ export default async function AnaliticaPage() {
           Conectá un store KV (Upstash) en Vercel para el histórico real.
         </div>
       )}
-      <AnaliticaView initial={{ orders, combos: settings.combos }} />
+      <AnaliticaView initial={{ orders, combos: settings.combos, history: settings.history || [] }} />
     </AdminShell>
   );
 }
