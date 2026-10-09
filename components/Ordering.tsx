@@ -514,6 +514,8 @@ export function Ordering({
                   <span className="cc-q">{c.min}</span>
                   <span className="cc-l">platos</span>
                   <span className="cc-p tnum">{crc(c.price)}</span>
+                  {/* precio por plato del combo: deja ver de una el ahorro real */}
+                  <span className="cc-u tnum">{crc(Math.round(c.price / c.min))} c/u</span>
                 </div>
               ))}
             </div>

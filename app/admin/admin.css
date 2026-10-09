@@ -171,6 +171,30 @@
   .etq-name{font-size:1.7rem}
   .etq-line{font-size:1.15rem}
 }
+/* ===== Etiquetas imprimibles: una por envase ===== */
+.etq-modes{display:inline-flex;border:1px solid var(--line-strong);border-radius:11px;overflow:hidden}
+.etq-mode{border:0;border-left:1px solid var(--line-strong);background:#fff;color:var(--bordo-ink);
+  font-family:var(--body);font-weight:600;font-size:13.5px;padding:10px 15px;cursor:pointer}
+.etq-mode:first-child{border-left:0}
+.etq-mode.on{background:var(--bordo);color:var(--crema)}
+.etq-fmt{border:1px solid var(--line-strong);background:#fff;color:var(--bordo-ink);border-radius:11px;
+  padding:11px 13px;font-family:var(--body);font-weight:600;font-size:13.5px;cursor:pointer;max-width:100%}
+.etq-tip{margin-top:10px;font-size:13px;color:var(--muted);line-height:1.5}
+
+/* El pliego se ve al tamaño real: todo en mm, para juzgar si entra el nombre del plato. */
+.lbl-sheet{display:grid;justify-content:start;gap:0;margin-top:16px;background:#fff;
+  border:1px solid var(--line);border-radius:12px;padding:10px;overflow-x:auto}
+.lbl{box-sizing:border-box;display:flex;flex-direction:column;gap:1mm;overflow:hidden;
+  padding:2.5mm 3mm;color:#000;background:#fff;outline:1px dashed #C9B89A;outline-offset:-1px;break-inside:avoid}
+.lbl-top{display:flex;align-items:baseline;justify-content:space-between;gap:2mm}
+.lbl-who{font-family:var(--disp);font-weight:700;text-transform:uppercase;line-height:1.05;
+  letter-spacing:.01em;overflow-wrap:anywhere;min-width:0}
+.lbl-ono{color:#555;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lbl-dish{line-height:1.2;overflow-wrap:anywhere;min-width:0}
+.lbl-extra{font-weight:700}
+.lbl-note{border-top:1px solid #000;padding-top:1mm;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
+.lbl-foot{margin-top:auto;display:flex;justify-content:space-between;gap:2mm;color:#555}
+
 @media print{
   .admin{background:#fff}
   .admin-top,.admin-head,.tabs,.warn-banner,.no-print{display:none !important}
@@ -180,6 +204,13 @@
   .etq-card.all-done .etq-name,.etq-line.done .etq-dish,.etq-line.done .etq-qty{text-decoration:none}
   .etq-line.done{opacity:1}
   .etq-line.done .etq-box{background:#fff;border-color:var(--line-strong);color:transparent}
+  /* el pliego sale solo: sin marco, sin guías de corte y pegado al borde */
+  .lbl-sheet{margin:0;padding:0;border:0;border-radius:0;overflow:visible}
+  .lbl{outline:0}
+  /* en rollo cada etiqueta es su propia página */
+  .lbl-sheet.is-roll{display:block}
+  .lbl-sheet.is-roll .lbl{break-after:page}
+  .lbl-sheet.is-roll .lbl:last-child{break-after:auto}
 }
 
 /* analítica: producción por plato */
