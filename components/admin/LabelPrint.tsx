@@ -2,6 +2,7 @@
 
 import type { Order } from "@/lib/types";
 import { PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
+import { Wordmark } from "@/lib/brand";
 
 /**
  * Etiquetas imprimibles: **una etiqueta por envase**.
@@ -60,52 +61,90 @@ export interface LabelFormat {
   /** Tamaño y márgenes de página, tal cual van en la regla `@page`. */
   page: string;
   margin: string;
-  /** Tipografía en pt: el nombre manda, el resto acompaña. */
+  /**
+   * `full` entra todo. `compact` saca el día de entrega: en una tanda es el
+   * mismo en las 120 etiquetas, así que es lo primero que sobra cuando el
+   * espacio aprieta.
+   */
+  density: "full" | "compact";
+  /** Tipografía en pt. Debajo de 6 pt la térmica de 203 dpi empieza a fundir trazos. */
   name: number;
   body: number;
   small: number;
+  /** Ancho del wordmark en mm. Menos de 9 mm y deja de leerse "SANO". */
+  mark: number;
 }
 
 /**
- * Dos familias. Las de hoja sirven para probar en cualquier impresora común con
- * pliegos de stickers, sin comprar nada. Las de rollo son para una térmica.
+ * Ningún formato pasa de 50 mm en su lado largo, y ninguno baja de 25 mm de alto:
+ * a 21 mm, un plato que cae en dos líneas más el extra más la restricción ya no
+ * entran, y lo que se pierde es justamente la alergia.
+ *
+ * Las de hoja son para probar en papel sin comprar nada; las de rollo, para una
+ * térmica. Las medidas de hoja son una grilla propia: si se compran pliegos
+ * pre-troquelados de una marca, hay que calzar la geometría exacta de ese
+ * producto.
  */
 export const LABEL_FORMATS: LabelFormat[] = [
   {
-    id: "a4-24",
-    label: "Hoja A4 · 24 etiquetas",
-    hint: "70 × 35 mm · pliego de stickers 3 × 8",
+    id: "carta-40",
+    label: "Hoja Carta · 40 etiquetas",
+    hint: "48 × 25 mm · 4 × 10",
     kind: "sheet",
-    w: 70, h: 35, cols: 3,
-    page: "A4", margin: "8.5mm 0",
-    name: 11, body: 8, small: 6,
+    w: 48, h: 25, cols: 4,
+    page: "letter", margin: "14.7mm 11.95mm",
+    density: "compact",
+    name: 9.5, body: 7, small: 5.5, mark: 11,
   },
   {
-    id: "carta-10",
-    label: "Hoja Carta · 10 etiquetas",
-    hint: "101,6 × 50,8 mm · pliego tipo Avery 5163",
+    id: "carta-50",
+    label: "Hoja Carta · 50 etiquetas",
+    hint: "38 × 25 mm · 5 × 10",
     kind: "sheet",
-    w: 101.6, h: 50.8, cols: 2,
-    page: "letter", margin: "12.7mm 6.35mm",
-    name: 16, body: 11, small: 8,
+    w: 38, h: 25, cols: 5,
+    page: "letter", margin: "14.7mm 12.95mm",
+    density: "compact",
+    name: 8.5, body: 6.5, small: 5, mark: 9,
   },
   {
-    id: "rollo-62x50",
-    label: "Rollo 62 × 50 mm",
-    hint: "térmica de etiquetas, rollo ancho",
-    kind: "roll",
-    w: 62, h: 50, cols: 3,
-    page: "62mm 50mm", margin: "0",
-    name: 13, body: 10, small: 7,
+    id: "a4-55",
+    label: "Hoja A4 · 55 etiquetas",
+    hint: "38 × 25 mm · 5 × 11",
+    kind: "sheet",
+    w: 38, h: 25, cols: 5,
+    page: "A4", margin: "11mm 10mm",
+    density: "compact",
+    name: 8.5, body: 6.5, small: 5, mark: 9,
   },
   {
     id: "rollo-50x30",
     label: "Rollo 50 × 30 mm",
-    hint: "térmica de etiquetas, rollo angosto",
+    hint: "térmica · el más holgado",
     kind: "roll",
     w: 50, h: 30, cols: 4,
     page: "50mm 30mm", margin: "0",
-    name: 10, body: 7.5, small: 6,
+    density: "full",
+    name: 10, body: 7.5, small: 6, mark: 12,
+  },
+  {
+    id: "rollo-50x25",
+    label: "Rollo 50 × 25 mm",
+    hint: "térmica · medida corriente",
+    kind: "roll",
+    w: 50, h: 25, cols: 4,
+    page: "50mm 25mm", margin: "0",
+    density: "compact",
+    name: 9.5, body: 7, small: 5.5, mark: 11,
+  },
+  {
+    id: "rollo-40x25",
+    label: "Rollo 40 × 25 mm",
+    hint: "térmica · el más chico legible",
+    kind: "roll",
+    w: 40, h: 25, cols: 5,
+    page: "40mm 25mm", margin: "0",
+    density: "compact",
+    name: 8.5, body: 6.5, small: 5, mark: 9,
   },
 ];
 
@@ -115,12 +154,13 @@ export const LABEL_FORMATS: LabelFormat[] = [
  */
 export function LabelPrint({ units, format }: { units: LabelUnit[]; format: LabelFormat }) {
   const isRoll = format.kind === "roll";
+  const full = format.density === "full";
   return (
     <>
       {/* `@page` no acepta variables CSS, así que la regla se arma por formato. */}
       <style>{`@page{size:${format.page};margin:${format.margin}}`}</style>
       <div
-        className={`lbl-sheet${isRoll ? " is-roll" : ""}`}
+        className={`lbl-sheet${isRoll ? " is-roll" : ""}${full ? "" : " is-compact"}`}
         style={{ gridTemplateColumns: `repeat(${format.cols}, ${format.w}mm)` }}
       >
         {units.map((u) => (
@@ -153,10 +193,16 @@ export function LabelPrint({ units, format }: { units: LabelUnit[]; format: Labe
             )}
 
             <div className="lbl-foot" style={{ fontSize: `${format.small}pt` }}>
-              <span>{u.delivery}</span>
+              {/* Recurso oficial de marca (lib/brand · Wordmark), en negro: la térmica
+                  imprime un solo color y el bordó saldría tramado. El ancho va en
+                  el contenedor porque `brand.tsx` es auto-generado y no se toca. */}
+              <span className="lbl-mark" style={{ width: `${format.mark}mm` }} aria-hidden="true">
+                <Wordmark />
+              </span>
+              {full && <span className="lbl-day">{u.delivery}</span>}
               {u.of > 1 && (
-                <span className="tnum">
-                  {u.idx} de {u.of}
+                <span className="tnum lbl-n">
+                  {u.idx}/{u.of}
                 </span>
               )}
             </div>
