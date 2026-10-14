@@ -53,14 +53,18 @@ IDs `SANO-<n>` con piso 222 (`ORDER_SEQ_FLOOR`). Estados: `pendiente` / `pagado`
   solo si entra un pedido que aumenta la cantidad.
 - **Etiquetas** — resumen grande por cliente para escribir las etiquetas a mano.
 - **Analítica** — ingreso proyectado / confirmado / por cobrar, tasa de pago, ticket promedio,
-  producción por plato, platos y Market más vendidos, y el **ingreso histórico del negocio**.
+  producción por plato, platos y Market más vendidos, y el **ingreso por mes** (filtro por mes + histórico del negocio).
 - **Contenido** — menú semanal (guardar = abrir la semana), cupos, precios y combos,
   Proteína Extra, Sano Market, Evento privado e **Ingreso histórico**.
 
-### Ingreso histórico (`Settings.history`)
-Consolidado mensual que mantiene el dueño (seed en `lib/defaults.ts`, 14 meses desde sep-2025).
-**El mes en curso ya incluye lo que registró la plataforma**, por eso el **Total global** es la
-suma de esa tabla y **no** se le vuelven a sumar los pedidos del sitio. No duplicar.
+### Ingreso por mes (`lib/months.ts` + `Settings.history`)
+En **Analítica** el ingreso de cada mes son los pedidos **pagados** agrupados por la **fecha del pedido
+(`createdAt`) en hora de Costa Rica** (UTC-6; el cambio de mes es a las 06:00 UTC), así que el mes en curso se
+actualiza solo y se corre solo al cambiar de mes. `Settings.history` es el consolidado manual del dueño
+(meses anteriores a la plataforma o ventas fuera del sitio, seed en `lib/defaults.ts`). `reconcileMonths`
+toma, **por mes, el mayor** entre lo que registra la plataforma y lo cargado a mano: no se duplica ni se
+pierde nada. El **Total global** es la suma de esos ingresos mensuales. Hay un filtro por mes (mes actual,
+todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scripts/test-months.mts`.
 
 ## Desarrollo
 ```bash
