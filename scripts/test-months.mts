@@ -1,7 +1,7 @@
 // Tests de la analítica mensual (lib/months.ts).
 // Correr con: node --experimental-strip-types scripts/test-months.mts
 import assert from "node:assert/strict";
-import { crMonthKey, currentMonthKey, monthLabel, reconcileMonths } from "../lib/months.ts";
+import { crMonthKey, currentMonthKey, monthLabel, reconcileMonths, prevMonthKey, inRange } from "../lib/months.ts";
 
 // Mes en hora de Costa Rica (UTC-6): el cambio de mes es a las 06:00 UTC.
 assert.equal(crMonthKey("2026-10-01T05:59:59Z"), "2026-09"); // 11:59 p.m. del 30 sep en CR
@@ -64,5 +64,23 @@ assert.deepEqual(rows.map((r) => r.month), ["2026-08", "2026-09", "2026-10"]);
 assert.equal(rows[0].income, 0);
 assert.equal(rows[0].projected, 50000);
 assert.equal(rows[0].receivable, 50000);
+
+// Filtros de tiempo del ranking.
+const nowR = new Date("2026-10-14T15:00:00Z");
+assert.equal(prevMonthKey("2026-10"), "2026-09");
+assert.equal(prevMonthKey("2026-01"), "2025-12");
+assert.ok(inRange("2020-01-01T00:00:00Z", "all", nowR));
+assert.ok(inRange("2026-10-02T15:00:00Z", "cur", nowR));
+assert.ok(!inRange("2026-09-30T15:00:00Z", "cur", nowR));
+assert.ok(inRange("2026-09-30T15:00:00Z", "prev", nowR));
+assert.ok(!inRange("2026-10-01T05:59:00Z", "cur", nowR)); // todavía 30 sep en CR
+assert.ok(inRange("2026-10-01T05:59:00Z", "prev", nowR));
+assert.ok(inRange("2026-10-08T15:00:00Z", "7d", nowR));
+assert.ok(!inRange("2026-10-06T14:00:00Z", "7d", nowR));
+assert.ok(inRange("2026-09-20T15:00:00Z", "30d", nowR));
+assert.ok(!inRange("2026-09-10T15:00:00Z", "30d", nowR));
+assert.ok(!inRange("2026-10-20T15:00:00Z", "30d", nowR)); // futuro: no
+assert.ok(inRange("2026-08-15T15:00:00Z", "2026-08", nowR));
+assert.ok(!inRange("basura", "cur", nowR));
 
 console.log("months: todos los tests OK");

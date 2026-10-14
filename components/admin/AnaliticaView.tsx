@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Order, ComboTier, MonthlyIncome } from "@/lib/types";
 import { crc } from "@/lib/format";
-import { crMonthKey, currentMonthKey, monthLabel, reconcileMonths } from "@/lib/months";
+import { crMonthKey, currentMonthKey, inRange, monthLabel, prevMonthKey, reconcileMonths } from "@/lib/months";
+import { groupDishes } from "@/lib/dishes";
 import { DaySelect, type DayOpt } from "./DaySelect";
 
 function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: string }[]; unit?: string }) {
@@ -36,11 +37,12 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
 export function AnaliticaView({
   initial,
 }: {
-  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[] };
+  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[] };
 }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const combos = initial.combos;
   const history = initial.history;
+  const menu = initial.menu;
   const [prodWin, setProdWin] = useState<string>("all");
 
   // Mes elegido: "cur" = mes en curso (se corre solo al cambiar de mes), "all" = todo el tiempo, o "YYYY-MM".
@@ -110,11 +112,9 @@ export function AnaliticaView({
     const marketItems = paid.reduce((s, o) => s + o.market.reduce((x, m) => x + m.qty, 0), 0);
     const ticket = paid.length ? Math.round(ingreso / paid.length) : 0;
 
-    const dishMap: Record<string, number> = {};
     const mkMap: Record<string, { qty: number; rev: number }> = {};
     const winMap: Record<string, { label: string; count: number; ingreso: number }> = {};
     for (const o of paid) {
-      for (const d of o.dishes) dishMap[d.name] = (dishMap[d.name] || 0) + d.qty;
       for (const m of o.market) {
         mkMap[m.name] = mkMap[m.name] || { qty: 0, rev: 0 };
         mkMap[m.name].qty += m.qty;
@@ -129,10 +129,6 @@ export function AnaliticaView({
       w.ingreso += o.total;
     }
 
-    const topDishes = Object.entries(dishMap)
-      .map(([label, value]) => ({ label, value }))
-      .sort((x, y) => y.value - x.value)
-      .slice(0, 8);
     const topMarket = Object.entries(mkMap)
       .map(([label, v]) => ({ label, value: v.qty, sub: crc(v.rev) }))
       .sort((x, y) => y.value - x.value)
@@ -165,7 +161,7 @@ export function AnaliticaView({
       proyectado, porCobrar, tasaPago, prodWindows,
       ingreso, ingresoPlatos, ingresoMarket, platos, marketItems, ticket,
       pagados: paid.length, total: scoped.length, pendientes: scoped.length - paid.length,
-      topDishes, topMarket, byWindow, comboDist: comboDist.filter((c) => c.value > 0),
+      topMarket, byWindow, comboDist: comboDist.filter((c) => c.value > 0),
     };
   }, [scoped, combos]);
 
@@ -189,6 +185,45 @@ export function AnaliticaView({
       .sort((x, y) => y.value - x.value);
     return { rows, units: rows.reduce((s, r) => s + r.value, 0), orders: inWin.length };
   }, [scoped, prodWin]);
+
+  // Ranking de platos: cuenta TODOS los pedidos (pagados y pendientes), con filtro de tiempo propio
+  // y unión de nombres casi idénticos. Independiente del filtro de mes de arriba.
+  const [rankSel, setRankSel] = useState<string>("all");
+  const [rankAll, setRankAll] = useState(false);
+  const rankOptions = useMemo(() => {
+    const opts: { id: string; label: string }[] = [
+      { id: "all", label: "Todo el tiempo" },
+      { id: "cur", label: `Mes actual (${monthLabel(curKey)})` },
+      { id: "prev", label: `Mes anterior (${monthLabel(prevMonthKey(curKey))})` },
+      { id: "30d", label: "Últimos 30 días" },
+      { id: "7d", label: "Últimos 7 días" },
+    ];
+    const seen = new Set([curKey, prevMonthKey(curKey)]);
+    for (const r of [...monthly].reverse()) {
+      if (r.orders > 0 && !seen.has(r.month)) opts.push({ id: r.month, label: r.label });
+    }
+    return opts;
+  }, [monthly, curKey]);
+  const rank = useMemo(() => {
+    const items: { name: string; qty: number }[] = [];
+    let orderCount = 0;
+    for (const o of orders) {
+      if (!inRange(o.createdAt, rankSel, now)) continue;
+      orderCount += 1;
+      for (const d of o.dishes) items.push({ name: d.name, qty: d.qty });
+    }
+    const groups = groupDishes(items, menu);
+    const total = groups.reduce((s, g) => s + g.qty, 0);
+    const rows = groups.map((g) => ({
+      label: g.name,
+      value: g.qty,
+      sub:
+        `${total ? Math.round((g.qty / total) * 100) : 0}% de los platos` +
+        (g.variants.length ? ` · incluye: ${g.variants.map((v) => `“${v}”`).join(", ")}` : ""),
+    }));
+    return { rows, total, orderCount, merged: groups.reduce((n, g) => n + g.variants.length, 0) };
+  }, [orders, rankSel, now, menu]);
+  const rankShown = rankAll ? rank.rows : rank.rows.slice(0, 10);
 
   const hasOrders = a.total > 0;
 
@@ -338,8 +373,33 @@ export function AnaliticaView({
           </p>
           <RankBars rows={prod.rows} unit="ud" />
 
-          <div className="klabel" style={{ marginTop: 22 }}>Platos más vendidos (pagados)</div>
-          <RankBars rows={a.topDishes} unit="ud" />
+          <div className="aprod-head">
+            <div className="klabel" style={{ margin: 0 }}>Platos más vendidos</div>
+            <select
+              className="aprod-sel"
+              value={rankSel}
+              onChange={(e) => {
+                setRankSel(e.target.value);
+                setRankAll(false);
+              }}
+              aria-label="Período del ranking de platos"
+            >
+              {rankOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="aprod-note">
+            {rank.total} platos en {rank.orderCount} pedido{rank.orderCount === 1 ? "" : "s"} — cuenta <b>todos los pedidos</b> (pagados y
+            pendientes). Los nombres casi idénticos se unen
+            {rank.merged > 0 ? ` (${rank.merged} variante${rank.merged > 1 ? "s" : ""} unida${rank.merged > 1 ? "s" : ""})` : ""}.
+          </p>
+          <RankBars rows={rankShown} unit="ud" />
+          {rank.rows.length > 10 && (
+            <button className="obtn" style={{ marginTop: 10 }} onClick={() => setRankAll((v) => !v)}>
+              {rankAll ? "Ver solo los 10 primeros" : `Ver los ${rank.rows.length} platos`}
+            </button>
+          )}
 
           <div className="klabel">Sano Market más vendido (pagados)</div>
           <RankBars rows={a.topMarket} unit="ud" />
