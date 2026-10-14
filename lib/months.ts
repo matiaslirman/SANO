@@ -97,3 +97,31 @@ export function reconcileMonths(
       };
     });
 }
+
+/** Mes anterior a "YYYY-MM". */
+export function prevMonthKey(key: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) return "";
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
+}
+
+/**
+ * Filtro de tiempo por fecha del pedido: "all", "cur" (mes en curso), "prev" (mes anterior),
+ * "30d" / "7d" (últimos días, corridos desde ahora) o un mes "YYYY-MM" (hora CR).
+ */
+export function inRange(createdAt: string, range: string, now: Date = new Date()): boolean {
+  if (range === "all") return true;
+  const t = new Date(createdAt).getTime();
+  if (Number.isNaN(t)) return false;
+  if (range === "30d" || range === "7d") {
+    const days = range === "30d" ? 30 : 7;
+    return t <= now.getTime() && t >= now.getTime() - days * 86400000;
+  }
+  const key = crMonthKey(createdAt);
+  const cur = currentMonthKey(now);
+  if (range === "cur") return key === cur;
+  if (range === "prev") return key === prevMonthKey(cur);
+  return key === range;
+}
