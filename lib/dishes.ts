@@ -94,3 +94,13 @@ export function groupDishes(
     .map((g) => ({ name: g.name, qty: g.qty, variants: g.variants }))
     .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
 }
+
+/** Nombre original -> nombre unificado (para contar platos y combinaciones sin duplicar variantes). */
+export function canonicalMap(items: { name: string; qty: number }[], preferred: string[] = []): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const g of groupDishes(items, preferred)) {
+    map.set(g.name, g.name);
+    for (const v of g.variants) map.set(v, g.name);
+  }
+  return map;
+}

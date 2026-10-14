@@ -66,6 +66,18 @@ toma, **por mes, el mayor** entre lo que registra la plataforma y lo cargado a m
 pierde nada. El **Total global** es la suma de esos ingresos mensuales. Hay un filtro por mes (mes actual,
 todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scripts/test-months.mts`.
 
+### Ranking de platos e insights (`lib/dishes.ts`, `lib/insights.ts`)
+- **Ranking "Platos más vendidos"**: cuenta **todos los pedidos** (pagados y pendientes) con un dropdown de
+  tiempo propio (`inRange` en `lib/months.ts`). `groupDishes` une platos casi idénticos (tildes, mayúsculas,
+  typos de ~2 letras); es **conservador**: no une palabras distintas ni partes de más ("Pasta Corta
+  Carbonara" ≠ "Pasta Carbonara"). Manda el nombre del menú actual.
+- **Insights del negocio**: reglas deterministas sobre pedidos reales (combo más vendido, tamaño sin combo,
+  pedidos a 1 plato de un combo, plato más/menos pedido, paquetes, Market, Proteína Extra, viernes vs lunes,
+  clientes que repiten). Mínimo `MIN_ORDERS` pedidos; los de evento no cuentan. **No inventar insights**:
+  cada uno muestra el dato que lo respalda.
+- Tests: `node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-<x>.mts`
+  (`windows`, `months`, `dishes`, `insights`).
+
 ## Desarrollo
 ```bash
 npm run build                 # incluye typecheck + lint; que pase SIEMPRE antes de subir

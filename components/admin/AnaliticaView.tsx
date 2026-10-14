@@ -5,6 +5,7 @@ import type { Order, ComboTier, MonthlyIncome } from "@/lib/types";
 import { crc } from "@/lib/format";
 import { crMonthKey, currentMonthKey, inRange, monthLabel, prevMonthKey, reconcileMonths } from "@/lib/months";
 import { groupDishes } from "@/lib/dishes";
+import { computeInsights, MIN_ORDERS } from "@/lib/insights";
 import { DaySelect, type DayOpt } from "./DaySelect";
 
 function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: string }[]; unit?: string }) {
@@ -37,12 +38,13 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
 export function AnaliticaView({
   initial,
 }: {
-  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[] };
+  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[]; basePrice: number };
 }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const combos = initial.combos;
   const history = initial.history;
   const menu = initial.menu;
+  const basePrice = initial.basePrice;
   const [prodWin, setProdWin] = useState<string>("all");
 
   // Mes elegido: "cur" = mes en curso (se corre solo al cambiar de mes), "all" = todo el tiempo, o "YYYY-MM".
@@ -225,6 +227,13 @@ export function AnaliticaView({
   }, [orders, rankSel, now, menu]);
   const rankShown = rankAll ? rank.rows : rank.rows.slice(0, 10);
 
+  // Insights accionables: mismas reglas y período propio (usa todos los pedidos del período, salvo eventos).
+  const [insSel, setInsSel] = useState<string>("all");
+  const ins = useMemo(
+    () => computeInsights(orders.filter((o) => inRange(o.createdAt, insSel, now)), { menu, combos, basePrice }),
+    [orders, insSel, now, menu, combos, basePrice]
+  );
+
   const hasOrders = a.total > 0;
 
   const headIncome = sel === "all" ? hist.total : selRow?.income ?? 0;
@@ -347,6 +356,46 @@ export function AnaliticaView({
         muestra el <b>mayor</b> de los dos (así no se duplica ni se pierde nada). El mes en curso se compara
         recién cuando termina.
       </p>
+
+      <div className="aprod-head">
+        <div className="klabel" style={{ margin: 0 }}>Insights del negocio</div>
+        <select
+          className="aprod-sel"
+          value={insSel}
+          onChange={(e) => setInsSel(e.target.value)}
+          aria-label="Período de los insights"
+        >
+          {rankOptions.map((o) => (
+            <option key={o.id} value={o.id}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+      {!ins.enough ? (
+        <div className="otable" style={{ marginTop: 10 }}>
+          <div className="empty" style={{ padding: 18 }}>
+            Todavía no hay suficientes pedidos en este período para dar recomendaciones ({ins.orders} de {MIN_ORDERS}{" "}
+            mínimos). Probá con “Todo el tiempo”.
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="aprod-note">
+            Basado en {ins.orders} pedidos reales de este período (sin eventos privados). Son pistas calculadas con tus
+            números, no garantías: decidí vos.
+          </p>
+          <div className="ins-grid">
+            {ins.insights.map((i) => (
+              <div className="ins-card" key={i.id}>
+                <span className="ins-ico" aria-hidden="true">{i.icon}</span>
+                <div>
+                  <div className="ins-fact">{i.fact}</div>
+                  <div className="ins-act">👉 {i.action}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {!hasOrders ? (
         <div className="otable" style={{ marginTop: 20 }}>

@@ -232,3 +232,11 @@
 /* recordatorio de pago por WhatsApp (link con forma de botón) */
 .obtn.remind{display:inline-flex;align-items:center;text-decoration:none;border-color:var(--ok);color:var(--ok)}
 .obtn.remind:hover{background:#EAF4EC;border-color:var(--ok)}
+
+/* insights accionables */
+.ins-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:10px}
+.ins-card{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}
+.ins-ico{font-size:1.5rem;line-height:1;flex:0 0 auto;margin-top:2px}
+.ins-fact{font-weight:600;color:var(--bordo-ink);line-height:1.35}
+.ins-act{font-size:13.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+@media(max-width:700px){.ins-grid{grid-template-columns:1fr}}
