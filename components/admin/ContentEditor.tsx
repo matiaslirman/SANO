@@ -469,9 +469,9 @@ export function ContentEditor({
       <div className="editcard">
         <h3>Ingreso histórico</h3>
         <div className="sub">
-          Consolidado mensual del negocio que se ve en <b>Analítica</b> como <b>Total global</b>. El mes en
-          curso lo actualizás vos acá: ya incluye lo que registró la plataforma, así que el total no vuelve a
-          sumar los pedidos del sitio (no se duplica).
+          Consolidado mensual del negocio (meses anteriores a la plataforma o ventas fuera del sitio). En{" "}
+          <b>Analítica</b> cada mes muestra el <b>mayor</b> entre este monto y lo que registra la plataforma con
+          los pedidos pagados, así que <b>el mes en curso se actualiza solo</b> y no hace falta tocarlo acá.
         </div>
 
         <div className="edit-list">
