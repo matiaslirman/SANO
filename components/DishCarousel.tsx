@@ -7,7 +7,6 @@ const DISHES = [
   { slug: "vegetales-salteados", name: "Vegetales Salteados", w: 194, h: 289 },
   { slug: "pechuga-cordon-bleu", name: "Pechuga Cordon Bleu", w: 165, h: 280 },
   { slug: "costilla-22-bistro", name: "Costilla 22 Bistro", w: 167, h: 284 },
-  { slug: "crepas-pollo-salsa-blanca", name: "Crepas Pollo Salsa Blanca", w: 182, h: 290 },
   { slug: "salmon-salsa-caribena", name: "Salmón Salsa Caribeña", w: 178, h: 293 },
   { slug: "ossobucco-de-res", name: "Ossobucco de Res", w: 221, h: 265 },
   { slug: "mongolian-de-res", name: "Mongolian de Res", w: 184, h: 293 },
