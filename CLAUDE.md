@@ -25,6 +25,14 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - `components/Ordering.tsx` — **todo el flujo de pedido del cliente** (hero, selector de día,
   menú, Sano Market, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
   mismo componente sin selector de día, sin Market y sin countdown.
+- **Hero**: a la derecha, un **carrusel de platos** (`components/DishCarousel.tsx`): vitrina fija de fotos con
+  el nombre incluido en la imagen, en `public/platos/*.webp` (fondo transparente; el orden y los tamaños están
+  en el array `DISHES` del componente). Avanza solo, se desliza con el dedo y se pausa al tocarlo.
+  Para cambiar una foto, pisá el `.webp` (idealmente exportado @2x/@3x desde Figma). En modo evento va el sello.
+- **Tarjeta de cliente frecuente**: ya no está en el hero; es un **pop-up** (`components/LoyaltyPopup.tsx`) que
+  aparece al **volver de WhatsApp** tras crear un pedido (o a los ~3 s si la persona se queda en la página).
+  "Ya la tengo" / descargar lo apagan en ese dispositivo (`lib/loyalty.ts`, localStorage). No aparece en el
+  evento. El pie de página conserva su bloque "Ganá cortesías" con el enlace.
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
 - `app/admin/*` — panel: **Pedidos · Resumen cocina · Etiquetas · Analítica · Contenido**
   (pestañas en `components/admin/AdminShell.tsx`).

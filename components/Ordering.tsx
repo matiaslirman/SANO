@@ -6,9 +6,11 @@ import { priceForDishes, comboLabel, nextCombo, savingsVsBase, PROTEIN_EXTRA_LAB
 import { crc } from "@/lib/format";
 import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
+import { loyaltyDone } from "@/lib/loyalty";
+import { DishCarousel } from "./DishCarousel";
+import { LoyaltyPopup } from "./LoyaltyPopup";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
-const LOYALTY_URL = "https://add2wallet.com/SANO%20by%2022Bistro/wallet-pass/61/download";
 
 const mkey = (catId: string, item: string) => `${catId}|${item}`;
 
@@ -44,6 +46,9 @@ export function Ordering({
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<Order | null>(null);
+  // Pop-up de la tarjeta de cliente frecuente: se arma al crear el pedido y aparece al volver de WhatsApp.
+  const [loyaltyPending, setLoyaltyPending] = useState(false);
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [toast, setToast] = useState("");
 
   // ── entrega elegida por el cliente (próximo viernes / próximo lunes) ──
@@ -115,6 +120,29 @@ export function Ordering({
     const id = setInterval(refetchStatus, 45000);
     return () => clearInterval(id);
   }, [refetchStatus]);
+
+  // ── pop-up de la tarjeta: al volver de WhatsApp (la pestaña vuelve a estar visible) ──
+  useEffect(() => {
+    if (!loyaltyPending) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const show = () => {
+      setLoyaltyOpen(true);
+      setLoyaltyPending(false);
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") t = setTimeout(show, 500);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    // si la página nunca se ocultó (se quedó acá), se muestra igual a los pocos segundos
+    const fallback = setTimeout(() => {
+      if (document.visibilityState === "visible") show();
+    }, 3000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearTimeout(fallback);
+      if (t) clearTimeout(t);
+    };
+  }, [loyaltyPending]);
 
   // ── toast auto-hide ──
   useEffect(() => {
@@ -326,6 +354,7 @@ export function Ordering({
       if (win) win.location.href = link;
       else window.location.href = link;
       setCreated(order);
+      if (!isEvent && !loyaltyDone()) setLoyaltyPending(true);
       setDishQty({});
       setExtraQty({});
       setMarketQty({});
@@ -431,21 +460,8 @@ export function Ordering({
               <Seal className="hero-seal" />
             </div>
           ) : (
-            /* Tarjeta de cliente frecuente: arte + descarga del wallet-pass */
-            <div className="hero-loyalty">
-              <img
-                className="hero-loyalty-img"
-                src="/brand/tarjeta-cliente.webp"
-                width={2000}
-                height={1786}
-                alt="Tarjeta de cliente frecuente SANO: sumás sellos y recibís recordatorios y promos cada semana"
-                loading="eager"
-              />
-              <a className="loyalty-cta" href={LOYALTY_URL} target="_blank" rel="noopener noreferrer">
-                📲 Descargá tu tarjeta de cliente frecuente →
-              </a>
-              <span className="loyalty-cta-sub">Sumá sellos por compra, recibí recordatorios y promos cada semana.</span>
-            </div>
+            /* Carrusel de platos (la tarjeta de cliente frecuente pasó a un pop-up tras el pedido) */
+            <DishCarousel />
           )}
         </div>
       </section>
@@ -846,6 +862,7 @@ export function Ordering({
       <div style={{ height: totals.grand > 0 && !created ? 84 : 0 }} />
 
       {toast && <div className="toast show">{toast}</div>}
+      <LoyaltyPopup open={loyaltyOpen} onClose={() => setLoyaltyOpen(false)} />
     </>
   );
 }
