@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { getClientWindows } from "@/lib/windows";
 import { resolveExtraPrices } from "@/lib/pricing";
+import { resolveHeroPill } from "@/lib/hero";
 import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -31,6 +32,7 @@ export async function GET() {
     combos: settings.combos,
     windows,
     extraPrices: resolveExtraPrices(settings),
+    heroPill: resolveHeroPill(settings),
   };
   return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });
 }

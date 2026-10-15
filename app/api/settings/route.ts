@@ -45,6 +45,12 @@ export async function PATCH(req: Request) {
   if (typeof body.proteinExtraPrice === "number" && body.proteinExtraPrice >= 0) {
     patch.proteinExtraPrice = Math.min(1_000_000, Math.floor(body.proteinExtraPrice));
   }
+  if (body.heroPillMode === "auto" || body.heroPillMode === "siempre" || body.heroPillMode === "nunca") {
+    patch.heroPillMode = body.heroPillMode;
+  }
+  if (typeof body.heroPillHours === "number" && Number.isFinite(body.heroPillHours) && body.heroPillHours >= 1) {
+    patch.heroPillHours = Math.min(72, Math.floor(body.heroPillHours));
+  }
   if (body.proteinExtraByDish && typeof body.proteinExtraByDish === "object") {
     const by: Record<string, number> = {};
     for (const [k, v] of Object.entries(body.proteinExtraByDish)) {

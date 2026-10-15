@@ -7,6 +7,7 @@ import { crc } from "@/lib/format";
 import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 import { loyaltyDone } from "@/lib/loyalty";
+import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
 import { DishCarousel } from "./DishCarousel";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 
@@ -94,9 +95,17 @@ export function Ordering({
   }, [selWin.cutoffISO]);
 
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
+  // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
+  const paused = !isEvent && status.windows.length === 0;
   const heroPillRef = useRef<HTMLDivElement>(null);
   const [pillShow, setPillShow] = useState(false);
+  // ¿Se muestra el contador? Según el modo del panel: siempre / nunca / solo cuando faltan pocas horas para el cierre.
+  const pillMode = status.heroPill?.mode ?? "auto";
+  const pillHours = status.heroPill?.hours ?? HERO_PILL_DEFAULT_HOURS;
+  const showCountdown = !isEvent && shouldShowHeroPill(pillMode, pillHours, cd.totalMin, cd.closed);
+  const pillOnScreen = paused || showCountdown; // el contenedor del hero existe solo si hay algo que mostrar
   useEffect(() => {
+    setPillShow(false);
     const el = heroPillRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(
@@ -105,7 +114,7 @@ export function Ordering({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [pillOnScreen]);
 
   // ── refrescar estado (cupos/ventana) periódicamente ──
   const refetchStatus = useCallback(async () => {
@@ -190,8 +199,6 @@ export function Ordering({
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
-  // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
-  const paused = !isEvent && status.windows.length === 0;
   const soldOut = !paused && selWin.cuposDisponibles <= 0;
   const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !paused && !submitting;
 
@@ -386,7 +393,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className="wrap">
+        <div className={`wrap${isEvent ? "" : " wrap-dishes"}`}>
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -405,7 +412,7 @@ export function Ordering({
               </>
             ) : (
               <>
-                <h1>
+                <h1 className="hero-title">
                   Resolvé almuerzos <em>y cenas.</em>
                 </h1>
                 <p className="lead">
@@ -434,22 +441,34 @@ export function Ordering({
                   <span className="trust-extra">Atención personalizada 1 a 1</span>
                 </div>
 
-                {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
-                <div className="hero-urgency" ref={heroPillRef}>
-                  {paused ? (
-                    <span className="pill pill-paused">
-                      <span className="pill-blk">
-                        <span className="pill-lab">Pedidos</span>
-                        <span className="pill-val">Cerrados por ahora</span>
+                {/* Precio real + plazo de pedidos (el plazo se reemplaza por el contador cuando este aparece) */}
+                {!paused && (
+                  <div className="hero-meta">
+                    <span className="hero-price">{heroPriceLine(status.basePrice, status.combos)}</span>
+                    {!showCountdown && selWin.id && !cd.closed && (
+                      <span className="hero-close">{closingLine(selWin.cutoffISO, selWin.deliveryDateLabel)}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* PILL de urgencia — según el modo del panel; anclado en el hero, se despega y sigue al scrollear */}
+                {pillOnScreen && (
+                  <div className="hero-urgency" ref={heroPillRef}>
+                    {paused ? (
+                      <span className="pill pill-paused">
+                        <span className="pill-blk">
+                          <span className="pill-lab">Pedidos</span>
+                          <span className="pill-val">Cerrados por ahora</span>
+                        </span>
                       </span>
-                    </span>
-                  ) : (
-                    <>
-                      {renderPill(true)}
-                      <span className="sr-only" role="timer">{cdA11y}</span>
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        {renderPill(true)}
+                        <span className="sr-only" role="timer">{cdA11y}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -816,7 +835,7 @@ export function Ordering({
       </div>
 
       {/* PILL de urgencia flotante — aparece cuando el pill del hero sale de vista */}
-      {!isEvent && !paused && (
+      {!isEvent && !paused && showCountdown && (
         <button
           type="button"
           className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
