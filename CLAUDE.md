@@ -67,7 +67,12 @@ IDs `SANO-<n>` con piso 222 (`ORDER_SEQ_FLOOR`). Estados: `pendiente` / `pagado`
   solo en pendientes que dejaron teléfono).
 - **Resumen cocina** — checklist de producción por ítem, compartido entre pantallas; se reabre
   solo si entra un pedido que aumenta la cantidad.
-- **Etiquetas** — resumen grande por cliente para escribir las etiquetas a mano.
+- **Etiquetas** — resumen grande por cliente para escribir las etiquetas a mano, y pliego imprimible (una etiqueta por
+  envase, `components/admin/LabelPrint.tsx`). En la etiqueta **manda el plato** (negrita) y el cliente va debajo, más
+  chico; a la derecha va el **QR "volvé a pedir"** (`public/brand/qr-pedidos.svg` oficial → `https://sano-pied.vercel.app/`;
+  `qr-pedidos-bn.svg` es el mismo en negro para la térmica de un solo color) con el wordmark debajo. Si el pedido tiene
+  **nota/restricción**, esa nunca se corta: el QR baja 1,5 mm, se omite el wordmark y el plato se limita a 2 líneas.
+  Verificado que el QR se lee en todos los formatos (también simulando 203 dpi).
 - **Analítica** — ingreso proyectado / confirmado / por cobrar, tasa de pago, ticket promedio,
   producción por plato, platos y Market más vendidos, y el **ingreso por mes** (filtro por mes + histórico del negocio).
 - **Contenido** — menú semanal (guardar = abrir la semana), cupos, precios y combos,

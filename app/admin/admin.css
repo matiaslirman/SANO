@@ -186,22 +186,26 @@
   border:1px solid var(--line);border-radius:12px;padding:10px;overflow-x:auto}
 .lbl{box-sizing:border-box;display:flex;flex-direction:column;gap:.7mm;overflow:hidden;
   padding:1.6mm 2mm;color:#000;background:#fff;outline:1px dashed #C9B89A;outline-offset:-1px;break-inside:avoid}
-.lbl-top{display:flex;align-items:baseline;justify-content:space-between;gap:1.5mm}
-.lbl-who{font-family:var(--disp);font-weight:700;text-transform:uppercase;line-height:1.02;
-  letter-spacing:.01em;overflow-wrap:anywhere;min-width:0}
-.lbl-ono{color:#444;white-space:nowrap;font-variant-numeric:tabular-nums}
-.lbl-dish{line-height:1.15;overflow-wrap:anywhere;min-width:0}
+.lbl-main{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:1.5mm;min-width:0}
+.lbl-text{display:flex;flex-direction:column;gap:.6mm;min-width:0;flex:1 1 auto;overflow:hidden}
+.lbl-qr{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:.4mm;color:#000;text-align:center;line-height:1}
+.lbl-qr img{display:block;width:100%;height:auto}
+.lbl-qr-cap{font-weight:700;white-space:nowrap}
+.lbl-who{font-family:var(--disp);font-weight:600;text-transform:uppercase;line-height:1.05;
+  letter-spacing:.02em;overflow-wrap:anywhere;min-width:0;color:#222}
+.lbl-meta{color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1}
+.lbl-dish{font-weight:700;line-height:1.12;overflow-wrap:anywhere;min-width:0}
 /* Red de seguridad en los formatos chicos: si un plato se va de largo, se recorta
    el plato y nunca la restricción del cliente, que es lo que no se puede perder. */
-.lbl-sheet.is-compact .lbl-dish{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.lbl-extra{font-weight:700;line-height:1.15}
+.lbl-sheet.is-compact .lbl-dish{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.lbl.has-note .lbl-mark,.lbl.has-note .lbl-qr-cap,.lbl.has-note .lbl-meta{display:none}
+.lbl.has-note .lbl-text{gap:.3mm}
+.lbl-idx{font-family:var(--body);font-weight:600;font-size:.8em;letter-spacing:0;color:#444;white-space:nowrap}
+.lbl.has-note .lbl-dish{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.lbl-extra{font-weight:700;line-height:1.1}
 .lbl-note{border-top:.3mm solid #000;padding-top:.6mm;font-weight:700;line-height:1.15;overflow-wrap:anywhere}
-/* el pie ancla abajo: marca a la izquierda, datos de tanda a la derecha */
-.lbl-foot{margin-top:auto;display:flex;align-items:flex-end;justify-content:flex-end;gap:1.5mm;color:#444;line-height:1}
-.lbl-mark{display:block;flex:0 0 auto;margin-right:auto;color:#000}
+.lbl-mark{display:block;flex:0 0 auto;margin-top:.3mm;color:#000}
 .lbl-mark svg{display:block;width:100%;height:auto}
-.lbl-day{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.lbl-n{white-space:nowrap;flex:0 0 auto}
 
 @media print{
   .admin{background:#fff}
