@@ -406,3 +406,12 @@ footer .fbrand{margin-bottom:12px}
 .pextra-step button:disabled{opacity:.35;cursor:default}
 .pextra-step .q{min-width:26px;text-align:center;font-family:var(--disp);font-weight:600;color:var(--bordo)}
 .cextra{display:block;font-size:12px;color:var(--bordo);font-weight:600;margin-top:2px}
+
+/* Proteína Extra: chip en el hero y etiqueta en el plato; aviso de menú con pedidos cerrados */
+.hero-extra{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;margin-top:2px;border:1px solid rgba(255,241,180,.45);background:rgba(255,241,180,.12);color:var(--crema);border-radius:999px;padding:6px 13px;font-family:var(--body);font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+.hero-extra:hover{background:rgba(255,241,180,.22);border-color:var(--crema)}
+.hero-extra-p{font-weight:500;color:var(--crema-soft)}
+.dish-xtag{display:inline-block;align-self:flex-start;margin:-6px 0 0;background:var(--crema-bg);color:var(--bordo-ink);border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+.pause-wa{max-width:340px;margin:18px auto 0}
+.pause-hint{font-size:13px;color:var(--muted,#7a6a55);margin:10px 0 0}
+@media(max-width:700px){.hero-cta .btn-primary{white-space:normal}}

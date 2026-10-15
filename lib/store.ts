@@ -7,6 +7,7 @@ import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, Event
 import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
+import type { TrackEvent } from "./track";
 
 const K = {
   settings: "sano:settings",
@@ -15,6 +16,7 @@ const K = {
   seq: "sano:orderseq",
   kitchen: "sano:kitchen", // hash: windowId -> string[] (claves de ítems completados)
   event: "sano:event", // configuración del evento privado
+  track: "sano:track", // hash: evento -> contador (pop-up de la tarjeta, aviso de menú)
 };
 
 /** Clave estable del evento (agrupa sus pedidos) derivada del título. */
@@ -397,6 +399,27 @@ export const store = {
     return normalizeKitchen(raw);
   },
 
+  /** Suma 1 a un contador de uso (solo eventos de la lista de `lib/track.ts`). */
+  async trackEvent(name: TrackEvent): Promise<void> {
+    if (isPersistent()) {
+      await redis().hincrby(K.track, name, 1);
+    } else {
+      const db = await readFile();
+      db.track = db.track || {};
+      db.track[name] = (db.track[name] || 0) + 1;
+      await writeFile(db);
+    }
+  },
+
+  async getTrack(): Promise<Record<string, number>> {
+    let raw: Record<string, unknown> | null | undefined;
+    if (isPersistent()) raw = await redis().hgetall<Record<string, unknown>>(K.track);
+    else raw = (await readFile()).track;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw || {})) out[k] = Number(v) || 0;
+    return out;
+  },
+
   /** Marca/desmarca un ítem; al marcar guarda la cantidad. Devuelve el mapa actualizado. */
   async setKitchenItemDone(
     windowId: string,
@@ -528,6 +551,7 @@ interface DbFile {
   seq: number;
   kitchen?: Record<string, Record<string, number>>;
   event?: EventSettings;
+  track?: Record<string, number>;
 }
 
 function dataFile(): string {
@@ -547,6 +571,7 @@ async function readFile(): Promise<DbFile> {
       orders: parsed.orders || {},
       seq: parsed.seq || 0,
       kitchen: parsed.kitchen || {},
+      track: parsed.track || {},
       event: parsed.event ? { ...DEFAULT_EVENT, ...parsed.event } : DEFAULT_EVENT,
     };
   } catch {

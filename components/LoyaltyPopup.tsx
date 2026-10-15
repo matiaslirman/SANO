@@ -2,10 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { LOYALTY_URL, markLoyaltyDone } from "@/lib/loyalty";
+import { track } from "@/lib/track";
 
 /** Pop-up de la tarjeta de cliente frecuente: aparece al volver de WhatsApp tras confirmar un pedido. */
 export function LoyaltyPopup({ open, onClose }: { open: boolean; onClose: () => void }) {
   const primary = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    if (open) track("loyalty_shown");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -24,13 +29,18 @@ export function LoyaltyPopup({ open, onClose }: { open: boolean; onClose: () => 
 
   if (!open) return null;
 
-  const done = () => {
+  const finish = (ev: "loyalty_download" | "loyalty_have") => {
+    track(ev);
     markLoyaltyDone(); // no se vuelve a mostrar en este dispositivo
+    onClose();
+  };
+  const later = () => {
+    track("loyalty_later");
     onClose();
   };
 
   return (
-    <div className="lp-overlay" onClick={onClose}>
+    <div className="lp-overlay" onClick={later}>
       <div
         className="lp-card"
         role="dialog"
@@ -38,7 +48,7 @@ export function LoyaltyPopup({ open, onClose }: { open: boolean; onClose: () => 
         aria-labelledby="lp-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="lp-x" aria-label="Cerrar" onClick={onClose}>
+        <button type="button" className="lp-x" aria-label="Cerrar" onClick={later}>
           ×
         </button>
         <img
@@ -59,13 +69,13 @@ export function LoyaltyPopup({ open, onClose }: { open: boolean; onClose: () => 
           href={LOYALTY_URL}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={done}
+          onClick={() => finish("loyalty_download")}
         >
           📲 Descargá tu tarjeta →
         </a>
         <div className="lp-row">
-          <button type="button" className="lp-ghost" onClick={onClose}>Ahora no</button>
-          <button type="button" className="lp-ghost" onClick={done}>Ya la tengo</button>
+          <button type="button" className="lp-ghost" onClick={later}>Ahora no</button>
+          <button type="button" className="lp-ghost" onClick={() => finish("loyalty_have")}>Ya la tengo</button>
         </div>
       </div>
     </div>

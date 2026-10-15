@@ -6,6 +6,7 @@ import { crc } from "@/lib/format";
 import { crMonthKey, currentMonthKey, inRange, monthLabel, prevMonthKey, reconcileMonths } from "@/lib/months";
 import { groupDishes } from "@/lib/dishes";
 import { computeInsights, MIN_ORDERS } from "@/lib/insights";
+import { groupCustomers } from "@/lib/customers";
 import { DaySelect, type DayOpt } from "./DaySelect";
 
 function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: string }[]; unit?: string }) {
@@ -38,13 +39,14 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
 export function AnaliticaView({
   initial,
 }: {
-  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[]; basePrice: number };
+  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[]; basePrice: number; track: Record<string, number> };
 }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
   const combos = initial.combos;
   const history = initial.history;
   const menu = initial.menu;
   const basePrice = initial.basePrice;
+  const track = initial.track;
   const [prodWin, setProdWin] = useState<string>("all");
 
   // Mes elegido: "cur" = mes en curso (se corre solo al cambiar de mes), "all" = todo el tiempo, o "YYYY-MM".
@@ -234,6 +236,32 @@ export function AnaliticaView({
     [orders, insSel, now, menu, combos, basePrice]
   );
 
+  // Clientes: pedidos por cliente real (nombres parecidos y mismo teléfono se unen). Todo el historial, sin eventos.
+  const [custAll, setCustAll] = useState(false);
+  const cust = useMemo(() => {
+    const groups = groupCustomers(orders);
+    const repeat = groups.filter((g) => g.orders >= 2).length;
+    const rows = groups.map((g) => ({
+      label: g.name,
+      value: g.orders,
+      sub:
+        `${g.paidOrders} pagado${g.paidOrders === 1 ? "" : "s"}` +
+        (g.paidTotal ? ` · ${crc(g.paidTotal)}` : "") +
+        ` · último: ${new Date(g.lastOrderAt).toLocaleDateString("es-CR", { day: "numeric", month: "short", timeZone: "America/Costa_Rica" })}` +
+        (g.variants.length ? ` · incluye: ${g.variants.map((v) => `“${v}”`).join(", ")}` : "") +
+        (g.byPhone ? " · unido por teléfono" : ""),
+    }));
+    return { rows, customers: groups.length, repeat, merged: groups.reduce((n, g) => n + g.variants.length, 0) };
+  }, [orders]);
+  const custShown = custAll ? cust.rows : cust.rows.slice(0, 10);
+
+  // Pop-up de la tarjeta de cliente frecuente (contadores desde que se activó, sin datos personales)
+  const lShown = track.loyalty_shown || 0;
+  const lDown = track.loyalty_download || 0;
+  const lHave = track.loyalty_have || 0;
+  const lLater = track.loyalty_later || 0;
+  const lPct = (n: number) => (lShown ? `${Math.round((n / lShown) * 100)}%` : "—");
+
   const hasOrders = a.total > 0;
 
   const headIncome = sel === "all" ? hist.total : selRow?.income ?? 0;
@@ -396,6 +424,52 @@ export function AnaliticaView({
           </div>
         </>
       )}
+
+      <div className="klabel">Clientes</div>
+      {cust.customers === 0 ? (
+        <div className="otable" style={{ marginTop: 10 }}>
+          <div className="empty" style={{ padding: 18 }}>Todavía no hay pedidos de clientes.</div>
+        </div>
+      ) : (
+        <>
+          <p className="aprod-note">
+            {cust.customers} cliente{cust.customers === 1 ? "" : "s"} · {cust.repeat} ya volvieron a pedir (
+            {cust.customers ? Math.round((cust.repeat / cust.customers) * 100) : 0}%). Se cuentan <b>todos los pedidos</b>{" "}
+            (pagados y pendientes, sin eventos). Se unen nombres casi idénticos y el mismo teléfono; dos teléfonos
+            distintos nunca se unen
+            {cust.merged > 0 ? ` (${cust.merged} variante${cust.merged > 1 ? "s" : ""} unida${cust.merged > 1 ? "s" : ""})` : ""}.
+          </p>
+          <RankBars rows={custShown} unit="ped." />
+          {cust.rows.length > 10 && (
+            <button className="obtn" style={{ marginTop: 10 }} onClick={() => setCustAll((v) => !v)}>
+              {custAll ? "Ver solo los 10 primeros" : `Ver los ${cust.rows.length} clientes`}
+            </button>
+          )}
+        </>
+      )}
+
+      <div className="klabel">Tarjeta de cliente frecuente (pop-up)</div>
+      {lShown === 0 ? (
+        <div className="otable" style={{ marginTop: 10 }}>
+          <div className="empty" style={{ padding: 18 }}>
+            Todavía nadie vio el pop-up. Los contadores arrancan con el primer pedido que vuelva de WhatsApp.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="astat">
+            <div className="box"><div className="k">Vieron el pop-up</div><div className="v tnum">{lShown}</div></div>
+            <div className="box"><div className="k">Tocaron descargar</div><div className="v tnum">{lDown}<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 400 }}> · {lPct(lDown)}</span></div></div>
+            <div className="box"><div className="k">“Ya la tengo”</div><div className="v tnum">{lHave}<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 400 }}> · {lPct(lHave)}</span></div></div>
+            <div className="box"><div className="k">“Ahora no” / cerraron</div><div className="v tnum">{lLater}<span style={{ fontSize: 14, color: "var(--muted)", fontWeight: 400 }}> · {lPct(lLater)}</span></div></div>
+          </div>
+          <p className="aprod-note">
+            Cuenta toques en el botón, no instalaciones confirmadas: la descarga ocurre en otra página. Suma desde que
+            se activó el contador.
+          </p>
+        </>
+      )}
+      <p className="aprod-note">Pidieron que les avisen cuando salga el menú (con pedidos cerrados): <b>{track.menu_alert || 0}</b>.</p>
 
       {!hasOrders ? (
         <div className="otable" style={{ marginTop: 20 }}>

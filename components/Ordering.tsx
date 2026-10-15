@@ -10,6 +10,7 @@ import { loyaltyDone } from "@/lib/loyalty";
 import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
 import { DishCarousel } from "./DishCarousel";
 import { LoyaltyPopup } from "./LoyaltyPopup";
+import { track } from "@/lib/track";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -97,6 +98,11 @@ export function Ordering({
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
   // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
   const paused = !isEvent && status.windows.length === 0;
+  // Proteína Extra: ¿algún plato del menú la ofrece? (precio real configurado en Contenido)
+  const extraList = isEvent ? [] : status.menu.map((d) => status.extraPrices?.[d] || 0).filter((p) => p > 0);
+  const extraAvail = !paused && extraList.length > 0;
+  const extraMin = extraList.length ? Math.min(...extraList) : 0;
+  const menuAlertHref = `https://wa.me/${WA}?text=${encodeURIComponent("Hola Sano 👋 Avisame apenas salga el menú de la próxima semana, por favor.")}`;
   const heroPillRef = useRef<HTMLDivElement>(null);
   const [pillShow, setPillShow] = useState(false);
   // ¿Se muestra el contador? Según el modo del panel: siempre / nunca / solo cuando faltan pocas horas para el cierre.
@@ -419,11 +425,23 @@ export function Ordering({
                   Platos de chef, listos para retirar. Elegí los tuyos y coordinás todo por WhatsApp en un
                   minuto.
                 </p>
-                {!paused && (
+                {!paused ? (
                   <div className="hero-cta">
                     <button className="btn-primary" onClick={scrollToMenu}>
                       Pedir ahora →
                     </button>
+                  </div>
+                ) : (
+                  <div className="hero-cta">
+                    <a
+                      className="btn-primary"
+                      href={menuAlertHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track("menu_alert")}
+                    >
+                      💬 Avisame cuando salga el menú
+                    </a>
                   </div>
                 )}
                 <div className="trust">
@@ -445,6 +463,12 @@ export function Ordering({
                 {!paused && (
                   <div className="hero-meta">
                     <span className="hero-price">{heroPriceLine(status.basePrice, status.combos)}</span>
+                    {extraAvail && (
+                      <button type="button" className="hero-extra" onClick={scrollToMenu}>
+                        <span aria-hidden="true">💪</span> {PROTEIN_EXTRA_LABEL} disponible
+                        <span className="hero-extra-p tnum"> · desde +{crc(extraMin)}</span>
+                      </button>
+                    )}
                     {!showCountdown && selWin.id && !cd.closed && (
                       <span className="hero-close">{closingLine(selWin.cutoffISO, selWin.deliveryDateLabel)}</span>
                     )}
@@ -524,6 +548,16 @@ export function Ordering({
               <div className="pause-kick">Sano</div>
               <h2 className="pause-title">{ORDERS_PAUSED_TITLE}</h2>
               <p className="pause-text">{ORDERS_PAUSED_MESSAGE}</p>
+              <a
+                className="wa-btn pause-wa"
+                href={menuAlertHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => track("menu_alert")}
+              >
+                💬 Avisame cuando salga el menú
+              </a>
+              <p className="pause-hint">Te escribimos por WhatsApp apenas esté el menú de la semana.</p>
             </div>
           )}
 
@@ -565,6 +599,9 @@ export function Ordering({
                     <span className="idx">{i + 1}</span>
                     <h3>{dish}</h3>
                   </div>
+                  {q === 0 && extraPrice(dish) > 0 && (
+                    <span className="dish-xtag">💪 {PROTEIN_EXTRA_LABEL} disponible</span>
+                  )}
                   <div className="row2">
                     <span className="price-each">
                       Desde <b>{crc(status.basePrice)}</b> c/u
