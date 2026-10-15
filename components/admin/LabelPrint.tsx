@@ -73,6 +73,10 @@ export interface LabelFormat {
   small: number;
   /** Ancho del wordmark en mm. Menos de 9 mm y deja de leerse "SANO". */
   mark: number;
+  /** Plato: es lo principal de la etiqueta (el cliente va debajo, más chico). */
+  dish: number;
+  /** Lado del QR "volvé a pedir" en mm. Por debajo de ~12 mm la térmica de 203 dpi ya no lo resuelve bien. */
+  qr: number;
 }
 
 /**
@@ -94,7 +98,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 48, h: 25, cols: 4,
     page: "letter", margin: "14.7mm 11.95mm",
     density: "compact",
-    name: 9.5, body: 7, small: 5.5, mark: 11,
+    name: 9.5, body: 7, small: 5.5, mark: 11, dish: 7.5, qr: 15,
   },
   {
     id: "carta-50",
@@ -104,7 +108,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 38, h: 25, cols: 5,
     page: "letter", margin: "14.7mm 12.95mm",
     density: "compact",
-    name: 8.5, body: 6.5, small: 5, mark: 9,
+    name: 8.5, body: 6.5, small: 5, mark: 9, dish: 6.5, qr: 13,
   },
   {
     id: "a4-55",
@@ -114,7 +118,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 38, h: 25, cols: 5,
     page: "A4", margin: "11mm 10mm",
     density: "compact",
-    name: 8.5, body: 6.5, small: 5, mark: 9,
+    name: 8.5, body: 6.5, small: 5, mark: 9, dish: 6.5, qr: 13,
   },
   {
     id: "rollo-50x30",
@@ -124,7 +128,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 50, h: 30, cols: 4,
     page: "50mm 30mm", margin: "0",
     density: "full",
-    name: 10, body: 7.5, small: 6, mark: 12,
+    name: 10, body: 7.5, small: 6, mark: 12, dish: 8.5, qr: 16,
   },
   {
     id: "rollo-50x25",
@@ -134,7 +138,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 50, h: 25, cols: 4,
     page: "50mm 25mm", margin: "0",
     density: "compact",
-    name: 9.5, body: 7, small: 5.5, mark: 11,
+    name: 9.5, body: 7, small: 5.5, mark: 11, dish: 7.5, qr: 15,
   },
   {
     id: "rollo-40x25",
@@ -144,7 +148,7 @@ export const LABEL_FORMATS: LabelFormat[] = [
     w: 40, h: 25, cols: 5,
     page: "40mm 25mm", margin: "0",
     density: "compact",
-    name: 8.5, body: 6.5, small: 5, mark: 9,
+    name: 8.5, body: 6.5, small: 5, mark: 9, dish: 6.5, qr: 13,
   },
 ];
 
@@ -155,6 +159,9 @@ export const LABEL_FORMATS: LabelFormat[] = [
 export function LabelPrint({ units, format }: { units: LabelUnit[]; format: LabelFormat }) {
   const isRoll = format.kind === "roll";
   const full = format.density === "full";
+  // Con restricción del cliente, la nota es lo que no se puede cortar: el QR baja 1,5 mm, se omite el
+  // wordmark (el sello ya va en el QR) y el texto de arriba se limita a la altura del QR.
+  const qrFor = (hasNote: boolean) => (hasNote ? Math.max(12, format.qr - 1.5) : format.qr);
   return (
     <>
       {/* `@page` no acepta variables CSS, así que la regla se arma por formato. */}
@@ -166,24 +173,38 @@ export function LabelPrint({ units, format }: { units: LabelUnit[]; format: Labe
         {units.map((u) => (
           <div
             key={u.key}
-            className="lbl"
+            className={`lbl${u.note ? " has-note" : ""}`}
             style={{
               width: `${format.w}mm`,
               height: `${format.h}mm`,
               fontSize: `${format.body}pt`,
             }}
           >
-            <div className="lbl-top">
-              <span className="lbl-who" style={{ fontSize: `${format.name}pt` }}>
-                {u.customer}
-              </span>
-              <span className="lbl-ono" style={{ fontSize: `${format.small}pt` }}>
-                {u.orderId}
-              </span>
+            {/* Jerarquía: el plato manda (lo que hay en el envase); el cliente va debajo, más chico. */}
+            <div className="lbl-main">
+              <div className="lbl-text" style={u.note ? { maxHeight: `${qrFor(true)}mm` } : undefined}>
+                <div className="lbl-dish" style={{ fontSize: `${format.dish}pt` }}>{u.dish}</div>
+                {u.extra && <div className="lbl-extra">+ {PROTEIN_EXTRA_LABEL}</div>}
+                <div className="lbl-who" style={{ fontSize: `${format.name - 1}pt` }}>
+                  {u.customer}
+                  {u.note && u.of > 1 && <span className="lbl-idx tnum"> {u.idx}/{u.of}</span>}
+                </div>
+                <div className="lbl-meta tnum" style={{ fontSize: `${format.small}pt` }}>
+                  {u.orderId}
+                  {full ? ` · ${u.delivery}` : ""}
+                  {u.of > 1 ? ` · ${u.idx}/${u.of}` : ""}
+                </div>
+              </div>
+              {/* Columna de marca: QR oficial "volvé a pedir" (public/brand/qr-pedidos.svg, en negro para
+                  térmica de un solo color) y debajo el wordmark oficial. */}
+              <div className="lbl-qr" style={{ width: `${qrFor(!!u.note)}mm` }}>
+                <img src="/brand/qr-pedidos-bn.svg" alt="" width={qrFor(!!u.note) * 4} height={qrFor(!!u.note) * 4} />
+                {full && <span className="lbl-qr-cap" style={{ fontSize: `${format.small}pt` }}>Pedí de nuevo</span>}
+                <span className="lbl-mark" style={{ width: `${format.mark}mm` }} aria-hidden="true">
+                  <Wordmark />
+                </span>
+              </div>
             </div>
-
-            <div className="lbl-dish">{u.dish}</div>
-            {u.extra && <div className="lbl-extra">+ {PROTEIN_EXTRA_LABEL}</div>}
 
             {/* La restricción del cliente vive hoy solo en Pedidos; en el envase es lo que más importa. */}
             {u.note && (
@@ -191,21 +212,6 @@ export function LabelPrint({ units, format }: { units: LabelUnit[]; format: Labe
                 {u.note}
               </div>
             )}
-
-            <div className="lbl-foot" style={{ fontSize: `${format.small}pt` }}>
-              {/* Recurso oficial de marca (lib/brand · Wordmark), en negro: la térmica
-                  imprime un solo color y el bordó saldría tramado. El ancho va en
-                  el contenedor porque `brand.tsx` es auto-generado y no se toca. */}
-              <span className="lbl-mark" style={{ width: `${format.mark}mm` }} aria-hidden="true">
-                <Wordmark />
-              </span>
-              {full && <span className="lbl-day">{u.delivery}</span>}
-              {u.of > 1 && (
-                <span className="tnum lbl-n">
-                  {u.idx}/{u.of}
-                </span>
-              )}
-            </div>
           </div>
         ))}
       </div>
