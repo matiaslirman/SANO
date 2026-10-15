@@ -1,5 +1,6 @@
 import type { ComboTier, Order } from "./types";
 import { canonicalMap, groupDishes } from "./dishes";
+import { groupCustomers } from "./customers";
 import { crc } from "./format";
 
 /**
@@ -236,20 +237,16 @@ export function computeInsights(
     }
   }
 
-  // ── 9) Clientes que repiten (por nombre) ──
+  // ── 9) Clientes que repiten (nombres parecidos y teléfono se unen) ──
   {
-    const byName = new Map<string, number>();
-    for (const o of orders) {
-      const k = norm(o.customerName || "");
-      if (k) byName.set(k, (byName.get(k) || 0) + 1);
-    }
-    const customers = byName.size;
-    const repeat = [...byName.values()].filter((n) => n >= 2).length;
+    const groups = groupCustomers(orders);
+    const customers = groups.length;
+    const repeat = groups.filter((g) => g.orders >= 2).length;
     if (customers >= 5) {
       out.push({
         id: "repeat",
         icon: "🔁",
-        fact: `${repeat} de ${customers} clientes (${pct(repeat, customers)}%) ya volvieron a pedir (se cuentan por nombre).`,
+        fact: `${repeat} de ${customers} clientes (${pct(repeat, customers)}%) ya volvieron a pedir (se unen nombres casi idénticos y mismo teléfono).`,
         action: "Son tu base: cuidalos con la tarjeta de cliente frecuente y avisales cuando salga el menú nuevo.",
       });
     }

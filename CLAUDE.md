@@ -41,6 +41,12 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   aparece al **volver de WhatsApp** tras crear un pedido (o a los ~3 s si la persona se queda en la página).
   "Ya la tengo" / descargar lo apagan en ese dispositivo (`lib/loyalty.ts`, localStorage). No aparece en el
   evento. El pie de página conserva su bloque "Ganá cortesías" con el enlace.
+- **Proteína Extra visible**: si algún plato del menú tiene el extra activo (precio en Contenido), el hero muestra el chip
+  "💪 Proteína Extra disponible · desde +₡X" y cada plato lleva su etiqueta. Sin precio configurado no aparece nada.
+- **Pedidos cerrados**: el hero y la tarjeta de pausa ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
+  mensaje escrito; cuenta como evento `menu_alert`).
+- **Contadores de uso** (`lib/track.ts`, `POST /api/track`, `store.trackEvent/getTrack`, hash `sano:track`): pop-up de la
+  tarjeta (visto / descargar / "Ya la tengo" / "Ahora no") y `menu_alert`. Sin datos personales; se ven en Analítica.
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
 - `app/admin/*` — panel: **Pedidos · Resumen cocina · Etiquetas · Analítica · Contenido**
   (pestañas en `components/admin/AdminShell.tsx`).
@@ -91,8 +97,12 @@ todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scr
   pedidos a 1 plato de un combo, plato más/menos pedido, paquetes, Market, Proteína Extra, viernes vs lunes,
   clientes que repiten). Mínimo `MIN_ORDERS` pedidos; los de evento no cuentan. **No inventar insights**:
   cada uno muestra el dato que lo respalda.
+- **Clientes** (`lib/customers.ts`, sección en Analítica): pedidos por cliente real. El teléfono manda (mismos últimos
+  8 dígitos = mismo cliente; teléfonos distintos nunca se unen); sin teléfono solo se unen nombres casi idénticos
+  (tildes, mayúsculas, ~2 letras en nombres largos; "Ana" ≠ "Ana María"). Eventos no cuentan. Alimenta el insight de
+  clientes que repiten.
 - Tests: `node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-<x>.mts`
-  (`windows`, `months`, `dishes`, `insights`, `hero`).
+  (`windows`, `months`, `dishes`, `insights`, `hero`, `customers`).
 
 ## Desarrollo
 ```bash
