@@ -6,9 +6,12 @@ import { priceForDishes, comboLabel, nextCombo, savingsVsBase, PROTEIN_EXTRA_LAB
 import { crc } from "@/lib/format";
 import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
+import { loyaltyDone } from "@/lib/loyalty";
+import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
+import { DishCarousel } from "./DishCarousel";
+import { LoyaltyPopup } from "./LoyaltyPopup";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
-const LOYALTY_URL = "https://add2wallet.com/SANO%20by%2022Bistro/wallet-pass/61/download";
 
 const mkey = (catId: string, item: string) => `${catId}|${item}`;
 
@@ -44,6 +47,9 @@ export function Ordering({
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<Order | null>(null);
+  // Pop-up de la tarjeta de cliente frecuente: se arma al crear el pedido y aparece al volver de WhatsApp.
+  const [loyaltyPending, setLoyaltyPending] = useState(false);
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [toast, setToast] = useState("");
 
   // ── entrega elegida por el cliente (próximo viernes / próximo lunes) ──
@@ -89,9 +95,17 @@ export function Ordering({
   }, [selWin.cutoffISO]);
 
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
+  // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
+  const paused = !isEvent && status.windows.length === 0;
   const heroPillRef = useRef<HTMLDivElement>(null);
   const [pillShow, setPillShow] = useState(false);
+  // ¿Se muestra el contador? Según el modo del panel: siempre / nunca / solo cuando faltan pocas horas para el cierre.
+  const pillMode = status.heroPill?.mode ?? "auto";
+  const pillHours = status.heroPill?.hours ?? HERO_PILL_DEFAULT_HOURS;
+  const showCountdown = !isEvent && shouldShowHeroPill(pillMode, pillHours, cd.totalMin, cd.closed);
+  const pillOnScreen = paused || showCountdown; // el contenedor del hero existe solo si hay algo que mostrar
   useEffect(() => {
+    setPillShow(false);
     const el = heroPillRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(
@@ -100,7 +114,7 @@ export function Ordering({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [pillOnScreen]);
 
   // ── refrescar estado (cupos/ventana) periódicamente ──
   const refetchStatus = useCallback(async () => {
@@ -115,6 +129,29 @@ export function Ordering({
     const id = setInterval(refetchStatus, 45000);
     return () => clearInterval(id);
   }, [refetchStatus]);
+
+  // ── pop-up de la tarjeta: al volver de WhatsApp (la pestaña vuelve a estar visible) ──
+  useEffect(() => {
+    if (!loyaltyPending) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const show = () => {
+      setLoyaltyOpen(true);
+      setLoyaltyPending(false);
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") t = setTimeout(show, 500);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    // si la página nunca se ocultó (se quedó acá), se muestra igual a los pocos segundos
+    const fallback = setTimeout(() => {
+      if (document.visibilityState === "visible") show();
+    }, 3000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearTimeout(fallback);
+      if (t) clearTimeout(t);
+    };
+  }, [loyaltyPending]);
 
   // ── toast auto-hide ──
   useEffect(() => {
@@ -162,8 +199,6 @@ export function Ordering({
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
-  // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
-  const paused = !isEvent && status.windows.length === 0;
   const soldOut = !paused && selWin.cuposDisponibles <= 0;
   const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !paused && !submitting;
 
@@ -326,6 +361,7 @@ export function Ordering({
       if (win) win.location.href = link;
       else window.location.href = link;
       setCreated(order);
+      if (!isEvent && !loyaltyDone()) setLoyaltyPending(true);
       setDishQty({});
       setExtraQty({});
       setMarketQty({});
@@ -357,7 +393,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className="wrap">
+        <div className={`wrap${isEvent ? "" : " wrap-dishes"}`}>
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -376,7 +412,7 @@ export function Ordering({
               </>
             ) : (
               <>
-                <h1>
+                <h1 className="hero-title">
                   Resolvé almuerzos <em>y cenas.</em>
                 </h1>
                 <p className="lead">
@@ -405,22 +441,34 @@ export function Ordering({
                   <span className="trust-extra">Atención personalizada 1 a 1</span>
                 </div>
 
-                {/* PILL de urgencia — anclado en el hero; se despega y sigue al scrollear */}
-                <div className="hero-urgency" ref={heroPillRef}>
-                  {paused ? (
-                    <span className="pill pill-paused">
-                      <span className="pill-blk">
-                        <span className="pill-lab">Pedidos</span>
-                        <span className="pill-val">Cerrados por ahora</span>
+                {/* Precio real + plazo de pedidos (el plazo se reemplaza por el contador cuando este aparece) */}
+                {!paused && (
+                  <div className="hero-meta">
+                    <span className="hero-price">{heroPriceLine(status.basePrice, status.combos)}</span>
+                    {!showCountdown && selWin.id && !cd.closed && (
+                      <span className="hero-close">{closingLine(selWin.cutoffISO, selWin.deliveryDateLabel)}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* PILL de urgencia — según el modo del panel; anclado en el hero, se despega y sigue al scrollear */}
+                {pillOnScreen && (
+                  <div className="hero-urgency" ref={heroPillRef}>
+                    {paused ? (
+                      <span className="pill pill-paused">
+                        <span className="pill-blk">
+                          <span className="pill-lab">Pedidos</span>
+                          <span className="pill-val">Cerrados por ahora</span>
+                        </span>
                       </span>
-                    </span>
-                  ) : (
-                    <>
-                      {renderPill(true)}
-                      <span className="sr-only" role="timer">{cdA11y}</span>
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        {renderPill(true)}
+                        <span className="sr-only" role="timer">{cdA11y}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -431,21 +479,8 @@ export function Ordering({
               <Seal className="hero-seal" />
             </div>
           ) : (
-            /* Tarjeta de cliente frecuente: arte + descarga del wallet-pass */
-            <div className="hero-loyalty">
-              <img
-                className="hero-loyalty-img"
-                src="/brand/tarjeta-cliente.webp"
-                width={2000}
-                height={1786}
-                alt="Tarjeta de cliente frecuente SANO: sumás sellos y recibís recordatorios y promos cada semana"
-                loading="eager"
-              />
-              <a className="loyalty-cta" href={LOYALTY_URL} target="_blank" rel="noopener noreferrer">
-                📲 Descargá tu tarjeta de cliente frecuente →
-              </a>
-              <span className="loyalty-cta-sub">Sumá sellos por compra, recibí recordatorios y promos cada semana.</span>
-            </div>
+            /* Carrusel de platos (la tarjeta de cliente frecuente pasó a un pop-up tras el pedido) */
+            <DishCarousel />
           )}
         </div>
       </section>
@@ -800,7 +835,7 @@ export function Ordering({
       </div>
 
       {/* PILL de urgencia flotante — aparece cuando el pill del hero sale de vista */}
-      {!isEvent && !paused && (
+      {!isEvent && !paused && showCountdown && (
         <button
           type="button"
           className={`u-pill ${phaseClass}${pillShow && !created ? " show" : ""}`}
@@ -846,6 +881,7 @@ export function Ordering({
       <div style={{ height: totals.grand > 0 && !created ? 84 : 0 }} />
 
       {toast && <div className="toast show">{toast}</div>}
+      <LoyaltyPopup open={loyaltyOpen} onClose={() => setLoyaltyOpen(false)} />
     </>
   );
 }

@@ -67,6 +67,13 @@ img,svg{max-width:100%}
 .hero .wrap{padding-block:28px 46px;display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center}
 .hero h1{font-size:clamp(1.95rem,4.2vw,3.05rem);color:var(--crema);font-weight:600;letter-spacing:.005em;line-height:1.02}
 .hero h1 em{font-style:normal;color:#fff}
+/* sitio normal: título grande en mayúsculas (como los títulos de sección), acento crema; columna de fotos más ancha */
+.hero .wrap-dishes{grid-template-columns:1fr 1.15fr;gap:34px}
+.hero h1.hero-title{font-size:clamp(2.2rem,4.2vw,3.25rem);text-transform:uppercase;letter-spacing:.012em;line-height:.98;font-weight:700;color:#fff}
+.hero h1.hero-title em{color:var(--crema)}
+.hero-meta{display:flex;flex-direction:column;gap:5px;margin-top:16px}
+.hero-price{font-size:14.5px;font-weight:600;color:var(--crema)}
+.hero-close{font-size:13px;color:var(--crema-soft)}
 .hero .lead{margin-top:10px;max-width:42ch;color:#F6E7BE;font-size:clamp(.95rem,1.7vw,1.04rem)}
 .hero-cta{display:flex;flex-wrap:wrap;gap:11px;margin-top:16px;align-items:center}
 .btn-primary{border:0;background:var(--crema);color:var(--bordo-ink);font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:1rem;padding:14px 22px;border-radius:12px;box-shadow:var(--shadow-sm);cursor:pointer;text-decoration:none;display:inline-block}
@@ -87,13 +94,37 @@ img,svg{max-width:100%}
 .hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
 @keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
 
-/* tarjeta de cliente frecuente en el hero (sitio público) — arte + descarga */
-.hero-loyalty{display:flex;flex-direction:column;align-items:center;gap:14px;justify-self:center;max-width:100%}
-.hero-loyalty-img{width:min(440px,92%);height:auto;filter:drop-shadow(0 30px 52px rgba(0,0,0,.5));animation:cardFloat 7s ease-in-out infinite;transform-origin:center}
-@keyframes cardFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.loyalty-cta{display:inline-flex;align-items:center;gap:8px;background:rgba(255,241,180,.1);color:var(--crema);border:1px solid rgba(255,241,180,.5);font-family:var(--disp);font-weight:600;letter-spacing:.03em;text-transform:uppercase;font-size:12.5px;padding:11px 17px;border-radius:11px;text-decoration:none;text-align:center;line-height:1.2}
-.loyalty-cta:hover{background:rgba(255,241,180,.2);border-color:var(--crema)}
-.loyalty-cta-sub{font-size:12px;color:var(--crema-soft);text-align:center;max-width:36ch}
+/* carrusel de platos en el hero: rota solo, de forma continua y lenta (fotos con el nombre incluido; fondo transparente) */
+.dcar{display:flex;flex-direction:column;align-items:center;gap:12px;justify-self:center;width:100%;max-width:100%;min-width:0}
+.dcar-marquee{width:100%;min-width:0;overflow:hidden;padding:6px 0 10px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%)}
+.dcar-rail{display:flex;align-items:flex-end;width:max-content;animation:dcarSlide 40s linear infinite;will-change:transform}
+.dcar-rail.hold{animation-play-state:paused}
+.dcar-item{flex:0 0 auto;margin:0 18px 0 0}
+.dcar-item img{display:block;height:310px;width:auto;user-select:none;-webkit-user-drag:none}
+@keyframes dcarSlide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* "Reducir movimiento": sin animación; una sola tira que se desliza a mano */
+@media (prefers-reduced-motion:reduce){
+  .dcar-marquee{overflow-x:auto;scrollbar-width:none}
+  .dcar-marquee::-webkit-scrollbar{display:none}
+  .dcar-rail{animation:none!important}
+  .dcar-item[aria-hidden="true"]{display:none}
+}
+
+/* pop-up de la tarjeta de cliente frecuente (al volver de WhatsApp) */
+.lp-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(20,4,4,.7);backdrop-filter:blur(3px);animation:lpFade .2s ease-out}
+.lp-card{position:relative;width:min(420px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,var(--bordo),var(--bordo-deep,#6e1213));border:1px solid rgba(255,241,180,.25);border-radius:20px;padding:26px 22px 20px;text-align:center;color:var(--crema);box-shadow:0 30px 80px -20px rgba(0,0,0,.7);animation:lpPop .25s ease-out}
+.lp-x{position:absolute;top:8px;right:10px;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--crema-soft);font-size:26px;line-height:1;cursor:pointer}
+.lp-x:hover{color:var(--crema);background:rgba(255,241,180,.1)}
+.lp-img{display:block;width:min(300px,82%);height:auto;margin:0 auto 8px}
+.lp-title{font-family:var(--disp);font-size:1.5rem;text-transform:uppercase;letter-spacing:.03em;color:var(--crema);margin:4px 0 8px}
+.lp-text{font-size:14.5px;line-height:1.45;color:var(--crema-soft);margin:0 auto 16px;max-width:34ch}
+.lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--crema);color:var(--bordo-ink);font-family:var(--disp);font-weight:600;letter-spacing:.03em;text-transform:uppercase;font-size:14px;padding:13px 20px;border-radius:12px;text-decoration:none;width:100%}
+.lp-btn:focus-visible,.lp-ghost:focus-visible,.lp-x:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
+.lp-row{display:flex;justify-content:center;gap:18px;margin-top:12px}
+.lp-ghost{background:transparent;border:0;color:var(--crema-soft);font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:6px 4px}
+.lp-ghost:hover{color:var(--crema)}
+@keyframes lpFade{from{opacity:0}to{opacity:1}}
+@keyframes lpPop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 
 .hero-urgency{margin-top:20px}
 
@@ -294,6 +325,7 @@ footer .fbrand{margin-bottom:12px}
   .wrap{padding-inline:15px}
   .hero .wrap{padding-block:14px 40px;gap:13px}
   .hero h1{font-size:clamp(1.7rem,7.2vw,2.15rem)}
+  .hero h1.hero-title{font-size:clamp(2.1rem,9.8vw,2.75rem)}
   .hero .lead{display:none}
   .hero-cta{margin-top:12px}
   .hero-cta .btn-primary{width:100%;text-align:center;padding:15px 16px}
@@ -323,10 +355,10 @@ footer .fbrand{margin-bottom:12px}
   .market{margin-top:28px}
   .checkout{margin-top:28px}
   .sheet{padding-top:30px;padding-bottom:32px}
-  /* tarjeta de cliente frecuente: visible bajo el texto, más compacta */
-  .hero-loyalty{gap:12px;margin-top:4px}
-  .hero-loyalty-img{width:min(300px,76%)}
-  .loyalty-cta{font-size:12px;padding:11px 15px}
+  /* carrusel de platos: bajo el texto, más compacto */
+  .dcar{gap:10px;margin-top:4px}
+  .dcar-item img{height:250px}
+  .dcar-item{margin-right:14px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 

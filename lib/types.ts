@@ -19,6 +19,9 @@ export interface ComboTier {
  * es el consolidado real (incluye el mes en curso con lo que ya registró la
  * plataforma), así que NO se le vuelven a sumar los pedidos del sitio encima.
  */
+/** Cuándo se muestra el contador (cierra en… + cupos) del hero: siempre, nunca, o solo cerca del cierre. */
+export type HeroPillMode = "auto" | "siempre" | "nunca";
+
 export interface MonthlyIncome {
   month: string;  // "YYYY-MM"
   label: string;  // "Septiembre 2025"
@@ -36,6 +39,9 @@ export interface Settings {
   proteinExtraPrice?: number;
   /** Precio propio por plato (clave = nombre del plato). 0 = ese plato no ofrece el extra. Sin clave = precio por defecto. */
   proteinExtraByDish?: Record<string, number>;
+  /** Contador del hero: "auto" (solo cuando faltan `heroPillHours` h o menos para el cierre), "siempre" o "nunca". */
+  heroPillMode?: HeroPillMode;
+  heroPillHours?: number;
   /** Ingreso histórico mensual del negocio (editable en Contenido). */
   history?: MonthlyIncome[];
 }
@@ -111,4 +117,6 @@ export interface PublicStatus {
   windows: WindowInfo[];     // entregas ofrecidas (próximo viernes + próximo lunes)
   /** Proteína Extra: precio por plato del menú actual. Sin clave o 0 = no disponible. Ausente en el evento. */
   extraPrices?: Record<DishName, number>;
+  /** Contador del hero (ver Settings.heroPillMode). Ausente en el evento. */
+  heroPill?: { mode: HeroPillMode; hours: number };
 }

@@ -4,6 +4,7 @@ import { Ordering } from "@/components/Ordering";
 import { store } from "@/lib/store";
 import { getClientWindows } from "@/lib/windows";
 import { resolveExtraPrices } from "@/lib/pricing";
+import { resolveHeroPill } from "@/lib/hero";
 import type { PublicStatus, WindowInfo } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function Home() {
     combos: settings.combos,
     windows,
     extraPrices: resolveExtraPrices(settings),
+    heroPill: resolveHeroPill(settings),
   };
 
   return (

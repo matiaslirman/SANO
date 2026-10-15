@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Settings, MarketCategory, ComboTier, EventSettings, MonthlyIncome } from "@/lib/types";
+import type { Settings, MarketCategory, ComboTier, EventSettings, MonthlyIncome, HeroPillMode } from "@/lib/types";
 import { crc } from "@/lib/format";
 
 function Saved({ show }: { show: boolean }) {
@@ -23,6 +23,12 @@ export function ContentEditor({
   const [weekLabel, setWeekLabel] = useState(initialSettings.weekLabel);
   const [savedMenu, setSavedMenu] = useState(false);
   const [busyMenu, setBusyMenu] = useState(false);
+
+  // ── Contador del hero ──
+  const [heroMode, setHeroMode] = useState<HeroPillMode>(initialSettings.heroPillMode ?? "auto");
+  const [heroHours, setHeroHours] = useState<number>(initialSettings.heroPillHours ?? 2);
+  const [savedHero, setSavedHero] = useState(false);
+  const [busyHero, setBusyHero] = useState(false);
 
   // ── Proteína Extra ──
   const [extraPrice, setExtraPrice] = useState<number>(initialSettings.proteinExtraPrice || 0);
@@ -96,6 +102,15 @@ export function ContentEditor({
       flash(setSavedMenu);
     } finally {
       setBusyMenu(false);
+    }
+  }
+  async function saveHero() {
+    setBusyHero(true);
+    try {
+      await patchSettings({ heroPillMode: heroMode, heroPillHours: Math.min(72, Math.max(1, Math.floor(heroHours || 2))) });
+      flash(setSavedHero);
+    } finally {
+      setBusyHero(false);
     }
   }
   async function saveExtra() {
@@ -238,6 +253,45 @@ export function ContentEditor({
             {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
           </button>
           <Saved show={savedMenu} />
+        </div>
+      </div>
+
+      {/* CONTADOR DEL HERO */}
+      <div className="editcard">
+        <h3>Contador del hero</h3>
+        <div className="sub">
+          El contador (<b>“Cierra en…”</b> + cupos) de la portada. Cuando está escondido, el cliente ve una línea
+          chica con el plazo: <i>“Pedidos abiertos hasta el sábado 12 md”</i>. Lo recomendado es mostrarlo solo cerca
+          del cierre, para que la urgencia sea real.
+        </div>
+        <div className="cupos-edit">
+          <div className="field">
+            <label>Cuándo mostrarlo</label>
+            <select value={heroMode} onChange={(e) => setHeroMode(e.target.value as HeroPillMode)}>
+              <option value="auto">Solo cuando falten pocas horas para el cierre (recomendado)</option>
+              <option value="siempre">Siempre</option>
+              <option value="nunca">Nunca</option>
+            </select>
+          </div>
+          {heroMode === "auto" && (
+            <div className="field">
+              <label>Horas antes del cierre</label>
+              <input
+                type="number"
+                min={1}
+                max={72}
+                inputMode="numeric"
+                value={heroHours}
+                onChange={(e) => setHeroHours(parseInt(e.target.value) || 0)}
+              />
+            </div>
+          )}
+        </div>
+        <div>
+          <button className="save-btn" onClick={saveHero} disabled={busyHero}>
+            {busyHero ? "Guardando…" : "Guardar contador"}
+          </button>
+          <Saved show={savedHero} />
         </div>
       </div>
 

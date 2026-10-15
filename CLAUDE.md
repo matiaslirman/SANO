@@ -25,6 +25,22 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - `components/Ordering.tsx` — **todo el flujo de pedido del cliente** (hero, selector de día,
   menú, Sano Market, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
   mismo componente sin selector de día, sin Market y sin countdown.
+- **Hero**: título grande en mayúsculas (Oswald, acento crema en "Y CENAS."), una línea de **precio real**
+  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 12 md · Retiro lunes 19…").
+  A la derecha, un **carrusel de platos** (`components/DishCarousel.tsx`): vitrina fija de fotos con el nombre
+  incluido en la imagen, en `public/platos/*.webp` (fondo transparente; el orden y los tamaños están en el
+  array `DISHES`). **Rota solo de forma continua** (animación CSS en bucle, tira duplicada); se pausa con el
+  mouse o al mantener el dedo; con "reducir movimiento" queda una tira que se desliza a mano.
+  Para cambiar una foto, pisá el `.webp` (idealmente exportado @2x/@3x desde Figma). En modo evento va el sello
+  y el hero no cambia.
+- **Contador del hero** ("Cierra en…" + cupos): lo gobierna `Settings.heroPillMode` (`auto` | `siempre` |
+  `nunca`) y `heroPillHours`, editables en **Contenido → Contador del hero**. Por defecto `auto`: solo aparece
+  cuando faltan **2 h o menos** para el cierre (y se esconde al cerrar); la pill flotante sigue la misma regla.
+  Mientras está escondido, se ve la línea del plazo. Lógica y tests en `lib/hero.ts` / `scripts/test-hero.mts`.
+- **Tarjeta de cliente frecuente**: ya no está en el hero; es un **pop-up** (`components/LoyaltyPopup.tsx`) que
+  aparece al **volver de WhatsApp** tras crear un pedido (o a los ~3 s si la persona se queda en la página).
+  "Ya la tengo" / descargar lo apagan en ese dispositivo (`lib/loyalty.ts`, localStorage). No aparece en el
+  evento. El pie de página conserva su bloque "Ganá cortesías" con el enlace.
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
 - `app/admin/*` — panel: **Pedidos · Resumen cocina · Etiquetas · Analítica · Contenido**
   (pestañas en `components/admin/AdminShell.tsx`).
@@ -76,7 +92,7 @@ todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scr
   clientes que repiten). Mínimo `MIN_ORDERS` pedidos; los de evento no cuentan. **No inventar insights**:
   cada uno muestra el dato que lo respalda.
 - Tests: `node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-<x>.mts`
-  (`windows`, `months`, `dishes`, `insights`).
+  (`windows`, `months`, `dishes`, `insights`, `hero`).
 
 ## Desarrollo
 ```bash

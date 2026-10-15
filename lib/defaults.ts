@@ -43,6 +43,9 @@ export const DEFAULT_SETTINGS: Settings = {
   // "Proteína Extra" arranca desactivada: se enciende poniendo un precio en Contenido.
   proteinExtraPrice: 0,
   proteinExtraByDish: {},
+  // Contador del hero: solo aparece cuando faltan 2 h o menos para el cierre.
+  heroPillMode: "auto",
+  heroPillHours: 2,
   history: DEFAULT_HISTORY,
 };
 
