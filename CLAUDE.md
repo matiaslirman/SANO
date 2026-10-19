@@ -143,6 +143,28 @@ menú y abre el ciclo) → `POST /api/orders`.
   esquinas redondeadas caigan sobre el bordó oscuro (sin franja clara). No romper eso.
 - Estilos públicos en `app/globals.css`; panel en `app/admin/admin.css`.
 
+## Backlog (acordado, sin construir todavía)
+Orden: primero cerrar lo de "Avisame cuando salga el menú" con platos del historial; después lo de abajo.
+
+### Fidelización: tarjeta de 5 sellos (próximo tema)
+Hoy la tarjeta es un wallet-pass de **add2wallet** (`LOYALTY_URL` en `lib/loyalty.ts`) y los sellos los pone el dueño **a
+mano**; desde que los pedidos entran por la plataforma se le olvida sellar. Plan por fases:
+1. **Contador + recordatorio manual (sin API)**: sellos por cliente (reusar `lib/customers.ts`: teléfono manda, nombres
+   casi idénticos se unen), "Falta sellar" en Pedidos al marcar pagado/entregado, marca "sello puesto" por pedido y
+   columna de sellos (x/5) en Analítica → Clientes. Eventos no cuentan.
+2. **Botón "Sellar" que llama a la API de add2wallet** (la plataforma es Basetime a2w; su SDK expone `updatePass` y
+   `redeem`). Server-side (ruta API), con la llave en variable de entorno de Vercel (`ADD2WALLET_API_KEY`, **nunca** en el
+   código ni en el chat). Bloqueo conocido: el link de descarga es genérico, así que hay que poder **vincular cada pase con
+   un cliente** (teléfono/correo/ID de pase) antes de automatizar.
+3. **Automático al marcar pagado**, solo cuando 2 esté probado.
+Reglas por confirmar con el dueño: cuándo suma un sello (¿pagado o entregado? ¿monto mínimo?), qué se gana al completar 5
+y si la tarjeta se reinicia. Necesito: documentación/permisos de la API y cómo identifica la plataforma a cada cliente.
+
+### Otras ideas pendientes de decisión
+- **Combos clickeables** en el menú (meta con barra de progreso "llevás 3 de 10", sin pre-llenar el carrito).
+- **Placeholder de platos** en "Avisame cuando salga el menú": chips con los platos más pedidos del historial real
+  (`groupDishes` sobre pedidos; nunca inventar), que arman el mensaje de WhatsApp.
+
 ## Pendientes del dueño (no son código)
 - Renumerar el pedido de Diego (tocar el N° en Pedidos → 222).
 - **Configurar el store KV (Upstash) en producción**: sin eso los pedidos no persisten y el panel
