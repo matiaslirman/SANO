@@ -44,7 +44,11 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - **Proteína Extra visible**: si algún plato del menú tiene el extra activo (precio en Contenido), el hero muestra el chip
   "💪 Proteína Extra disponible · desde +₡X" y cada plato lleva su etiqueta. Sin precio configurado no aparece nada.
 - **Pedidos cerrados**: el hero y la tarjeta de pausa ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
-  mensaje escrito; cuenta como evento `menu_alert`).
+  mensaje escrito; cuenta como evento `menu_alert`). La tarjeta muestra chips tocables: **"Esta semana tuvimos"** (el menú
+  que acaba de cerrar, que sigue siendo `settings.menu` hasta publicar otro) y **"Los favoritos"** (top 10 de platos más
+  pedidos de siempre, **solo el nombre**, sin cifras; `lib/favorites.ts` → `topDishes`, datos reales, sin eventos, unidos
+  con `groupDishes` y sin repetir los del menú). Lo que la persona toca se agrega al mensaje de WhatsApp (`menuAlertMessage`).
+  Llega en `PublicStatus.closed` solo cuando el sitio está pausado.
 - **Contadores de uso** (`lib/track.ts`, `POST /api/track`, `store.trackEvent/getTrack`, hash `sano:track`): pop-up de la
   tarjeta (visto / descargar / "Ya la tengo" / "Ahora no") y `menu_alert`. Sin datos personales; se ven en Analítica.
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).

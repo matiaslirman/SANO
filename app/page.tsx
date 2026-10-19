@@ -35,6 +35,7 @@ export default async function Home() {
     windows,
     extraPrices: resolveExtraPrices(settings),
     heroPill: resolveHeroPill(settings),
+    ...(windows.length === 0 ? { closed: await store.getClosedShowcase(settings.menu) } : {}),
   };
 
   return (

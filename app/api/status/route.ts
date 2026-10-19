@@ -33,6 +33,7 @@ export async function GET() {
     windows,
     extraPrices: resolveExtraPrices(settings),
     heroPill: resolveHeroPill(settings),
+    ...(windows.length === 0 ? { closed: await store.getClosedShowcase(settings.menu) } : {}),
   };
   return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });
 }

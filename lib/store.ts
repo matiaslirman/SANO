@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
 import type { TrackEvent } from "./track";
+import { topDishes } from "./favorites";
 
 const K = {
   settings: "sano:settings",
@@ -210,6 +211,12 @@ export const store = {
       ],
     };
     return { event, eventId, status };
+  },
+
+  /** Qué se muestra con los pedidos cerrados: el menú que cerró y los platos más pedidos (solo nombres). */
+  async getClosedShowcase(menu: string[]): Promise<{ thisWeek: string[]; favorites: string[] }> {
+    const orders = await this.listOrders();
+    return { thisWeek: menu, favorites: topDishes(orders, menu) };
   },
 
   async listOrders(): Promise<Order[]> {
