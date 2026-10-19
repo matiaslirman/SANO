@@ -66,6 +66,9 @@ Cuando el ciclo cierra y no se publicó menú nuevo, **los pedidos se pausan**
 ### Pedidos
 IDs `SANO-<n>` con piso 222 (`ORDER_SEQ_FLOOR`). Estados: `pendiente` / `pagado`, más
 `completed` (entregado). Los de evento llevan `eventId`. El teléfono (`whatsapp`) es opcional.
+El **correo** (`email`, opcional, minúsculas; `lib/contact.ts`) vincula al cliente con su tarjeta de sellos: se pide en
+"Tus datos" (no en eventos), se valida en cliente y servidor (400 si viene mal escrito) y **se recuerda en el celular**
+(localStorage `sano:contact`: nombre, WhatsApp y correo) para escribirlo una sola vez.
 
 ## Panel admin
 - **Pedidos** — dropdown de día (`components/admin/DaySelect.tsx`), cupos, marcar pagado,
@@ -102,7 +105,8 @@ todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scr
   pedidos a 1 plato de un combo, plato más/menos pedido, paquetes, Market, Proteína Extra, viernes vs lunes,
   clientes que repiten). Mínimo `MIN_ORDERS` pedidos; los de evento no cuentan. **No inventar insights**:
   cada uno muestra el dato que lo respalda.
-- **Clientes** (`lib/customers.ts`, sección en Analítica): pedidos por cliente real. El teléfono manda (mismos últimos
+- **Clientes** (`lib/customers.ts`, sección en Analítica): pedidos por cliente real. El **correo** manda (mismo correo =
+  mismo cliente; correos distintos nunca se unen); luego el teléfono (mismos últimos
   8 dígitos = mismo cliente; teléfonos distintos nunca se unen); sin teléfono solo se unen nombres casi idénticos
   (tildes, mayúsculas, ~2 letras en nombres largos; "Ana" ≠ "Ana María"). Eventos no cuentan. Alimenta el insight de
   clientes que repiten.

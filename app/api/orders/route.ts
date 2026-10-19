@@ -4,6 +4,7 @@ import { store, OrdersPausedError, type NewOrderInput } from "@/lib/store";
 import { isAdmin } from "@/lib/auth-server";
 import { EVENT_COOKIE, verifyEventToken } from "@/lib/event-auth";
 import { getCycleWindows, getNextWindow } from "@/lib/windows";
+import { isValidEmail } from "@/lib/contact";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,10 @@ export async function POST(req: Request) {
   }
   if (!body.customerName || !body.customerName.trim()) {
     return NextResponse.json({ error: "Falta el nombre" }, { status: 400 });
+  }
+
+  if (body.email && !isValidEmail(body.email)) {
+    return NextResponse.json({ error: "Revisá tu correo: no parece estar bien escrito." }, { status: 400 });
   }
 
   try {

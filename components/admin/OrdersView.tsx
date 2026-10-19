@@ -258,6 +258,7 @@ export function OrdersView({ initial }: { initial: Data }) {
                 {o.customerName}
                 <small>
                   {o.whatsapp ? o.whatsapp + " · " : ""}
+                  {o.email ? o.email + " · " : ""}
                   {fmtDate(o.createdAt)}
                 </small>
                 {o.eventId ? (

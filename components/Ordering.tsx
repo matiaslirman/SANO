@@ -11,6 +11,7 @@ import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS
 import { DishCarousel } from "./DishCarousel";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
+import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -44,6 +45,8 @@ export function Ordering({
   const [marketQty, setMarketQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const emailBad = email.trim() !== "" && !isValidEmail(email);
   const [notes, setNotes] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -159,6 +162,16 @@ export function Ordering({
     };
   }, [loyaltyPending]);
 
+  // ── datos recordados en este celular (nombre, WhatsApp y correo): se escriben una vez ──
+  useEffect(() => {
+    if (isEvent) return;
+    const c = loadContact();
+    if (!c) return;
+    setName((v) => v || c.name);
+    setPhone((v) => v || c.phone);
+    setEmail((v) => v || c.email);
+  }, [isEvent]);
+
   // ── toast auto-hide ──
   useEffect(() => {
     if (!toast) return;
@@ -206,7 +219,7 @@ export function Ordering({
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
   const soldOut = !paused && selWin.cuposDisponibles <= 0;
-  const canSubmit = totals.grand > 0 && name.trim().length > 0 && !soldOut && !paused && !submitting;
+  const canSubmit = totals.grand > 0 && name.trim().length > 0 && !emailBad && !soldOut && !paused && !submitting;
 
   // ── suggested para el upsell (4 destacados) ──
   const suggested = useMemo(() => {
@@ -342,6 +355,7 @@ export function Ordering({
         event: isEvent || undefined,
         customerName: name.trim(),
         whatsapp: phone.trim(),
+        email: !isEvent && email.trim() ? email.trim() : undefined,
         notes: notes.trim(),
         windowId: selWin.id,
         dishes: Object.entries(dishQty)
@@ -367,6 +381,7 @@ export function Ordering({
       if (win) win.location.href = link;
       else window.location.href = link;
       setCreated(order);
+      if (!isEvent) saveContact({ name, phone, email });
       if (!isEvent && !loyaltyDone()) setLoyaltyPending(true);
       setDishQty({});
       setExtraQty({});
@@ -382,8 +397,10 @@ export function Ordering({
 
   function newOrder() {
     setCreated(null);
-    setName("");
-    setPhone("");
+    const c = isEvent ? null : loadContact();
+    setName(c?.name || "");
+    setPhone(c?.phone || "");
+    setEmail(c?.email || "");
     setNotes("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -740,6 +757,28 @@ export function Ordering({
                     />
                     <div className="hint">Para avisarte si queda algo pendiente de tu pedido.</div>
                   </div>
+                  {!isEvent && (
+                    <div className="field">
+                      <label htmlFor="em">Correo <span style={{ textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+                      <input
+                        id="em"
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        aria-invalid={emailBad || undefined}
+                        placeholder="Ej: maria@correo.com"
+                      />
+                      {emailBad ? (
+                        <div className="hint" style={{ color: "var(--bordo)" }}>Revisá el correo: no parece estar bien escrito.</div>
+                      ) : (
+                        <div className="hint">Para sumar tus sellos de cliente frecuente: usá el mismo correo con el que tenés tu tarjeta.</div>
+                      )}
+                    </div>
+                  )}
                   <div className="field">
                     <label htmlFor="nt">Restricciones o ajustes menores</label>
                     <textarea id="nt" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej: sin cebolla, alérgico a maní…" />

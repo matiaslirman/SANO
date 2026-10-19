@@ -61,7 +61,7 @@ export function LoyaltyPopup({ open, onClose }: { open: boolean; onClose: () => 
         <h3 id="lp-title" className="lp-title">¡Gracias por tu pedido!</h3>
         <p className="lp-text">
           Sumá sellos por cada compra y recibí recordatorios y promos cada semana con tu tarjeta de cliente
-          frecuente.
+          frecuente. Usá el mismo correo con el que pedís para que te sumemos los sellos.
         </p>
         <a
           ref={primary}
