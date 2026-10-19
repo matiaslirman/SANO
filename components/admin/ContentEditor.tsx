@@ -261,7 +261,7 @@ export function ContentEditor({
         <h3>Contador del hero</h3>
         <div className="sub">
           El contador (<b>“Cierra en…”</b> + cupos) de la portada. Cuando está escondido, el cliente ve una línea
-          chica con el plazo: <i>“Pedidos abiertos hasta el sábado 12 md”</i>. Lo recomendado es mostrarlo solo cerca
+          chica con el plazo: <i>“Pedidos abiertos hasta el sábado 7:30 p. m.”</i>. Lo recomendado es mostrarlo solo cerca
           del cierre, para que la urgencia sea real.
         </div>
         <div className="cupos-edit">

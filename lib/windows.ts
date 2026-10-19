@@ -2,15 +2,16 @@
  * Ventanas de entrega de Sano.
  *
  * Dos cierres de pedido por semana (hora de Costa Rica, UTC-6, sin horario de verano):
- *   - Jueves 12:00 md  -> entrega Viernes  (8:00 a.m. – 12:00 md)
- *   - Sábado 12:00 md   -> entrega Lunes    (8:00 a.m. – 12:00 md)
+ *   - Jueves 12:00 md     -> entrega Viernes  (8:00 a.m. – 12:00 md)
+ *   - Sábado 7:30 p. m.   -> entrega Lunes    (8:00 a.m. – 12:00 md)
  *
- * 12:00 en Costa Rica = 18:00 UTC del mismo día calendario.
- * Todo el cálculo se hace en UTC para no depender del huso del servidor.
+ * El cálculo se hace en "hora CR" (UTC-6) sin depender del huso del servidor. El sábado 7:30 p. m. CR
+ * ya es domingo 01:30 UTC, por eso el `id` de la ventana es la fecha CR del cierre (el sábado) y no la
+ * fecha UTC: así los pedidos ya guardados con id de sábado siguen cayendo en la misma ventana.
  */
 
 export interface DeliveryWindow {
-  id: string;            // YYYY-MM-DD del cierre (= fecha CR)
+  id: string;            // YYYY-MM-DD del cierre en fecha CR (el sábado, aunque en UTC ya sea domingo)
   cutoff: Date;          // instante absoluto del cierre
   cutoffISO: string;
   deliveryEnd: Date;     // fin del retiro (12:00 md CR del día de entrega)
@@ -30,31 +31,49 @@ const MESES_CORTO = [
 ];
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-const HOUR_UTC = 18; // 12:00 CR
+/** Costa Rica = UTC-6 todo el año. */
+const CR_OFFSET_MS = 6 * 3600 * 1000;
 
-function nextCutoffForDow(now: Date, dowUTC: number): Date {
-  const d = new Date(Date.UTC(
-    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), HOUR_UTC, 0, 0, 0
-  ));
-  let diff = (dowUTC - d.getUTCDay() + 7) % 7;
-  if (diff === 0 && d.getTime() <= now.getTime()) diff = 7;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d;
+/** Hora de cierre (hora CR) y días hasta la entrega, por día de la semana (0 = domingo). */
+const CUTOFFS: Record<number, { hour: number; minute: number; deliver: number }> = {
+  4: { hour: 12, minute: 0, deliver: 1 },  // Jueves 12 md      -> Viernes
+  6: { hour: 19, minute: 30, deliver: 2 }, // Sábado 7:30 p. m. -> Lunes
+};
+const DEFAULT_CUTOFF = { hour: 12, minute: 0, deliver: 2 }; // ids de otros días (reasignación a mano)
+
+/** Fecha "de pared" CR: un Date cuyos campos UTC son la hora CR. */
+const toCR = (d: Date) => new Date(d.getTime() - CR_OFFSET_MS);
+const fromCR = (d: Date) => new Date(d.getTime() + CR_OFFSET_MS);
+
+/** Instante del cierre para una fecha CR (campos UTC de `crDay`: año/mes/día) y un día de la semana. */
+function cutoffAt(crDay: Date, dow: number): Date {
+  const c = CUTOFFS[dow] || DEFAULT_CUTOFF;
+  return fromCR(new Date(Date.UTC(crDay.getUTCFullYear(), crDay.getUTCMonth(), crDay.getUTCDate(), c.hour, c.minute, 0, 0)));
+}
+
+function nextCutoffForDow(now: Date, dow: number): Date {
+  const cr = toCR(now);
+  const day = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), cr.getUTCDate()));
+  let diff = (dow - day.getUTCDay() + 7) % 7;
+  if (diff === 0 && cutoffAt(day, dow).getTime() <= now.getTime()) diff = 7;
+  day.setUTCDate(day.getUTCDate() + diff);
+  return cutoffAt(day, dow);
 }
 
 function buildWindow(cutoff: Date, offset: number): DeliveryWindow {
-  const delivery = new Date(cutoff.getTime());
-  delivery.setUTCDate(delivery.getUTCDate() + offset);
+  const cr = toCR(cutoff);
+  // Fin del retiro: 12:00 md CR del día de entrega.
+  const deliveryCR = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), cr.getUTCDate() + offset, 12, 0, 0, 0));
+  const delivery = fromCR(deliveryCR);
 
-  const dLabel = DIAS[delivery.getUTCDay()];
-  const day = delivery.getUTCDate();
-  const month = delivery.getUTCMonth();
+  const dLabel = DIAS[deliveryCR.getUTCDay()];
+  const day = deliveryCR.getUTCDate();
+  const month = deliveryCR.getUTCMonth();
 
   return {
-    id: cutoff.toISOString().slice(0, 10),
+    id: cr.toISOString().slice(0, 10),
     cutoff,
     cutoffISO: cutoff.toISOString(),
-    // `delivery` cae a las 18:00 UTC (= 12 md CR) del día de entrega: fin del retiro.
     deliveryEnd: delivery,
     deliveryISO: delivery.toISOString(),
     deliveryLabel: dLabel,
@@ -74,7 +93,7 @@ export function getNextWindow(now: Date = new Date()): DeliveryWindow {
 /** Las entregas ofrecidas al cliente: el próximo viernes y el próximo lunes, ordenadas por cierre. */
 export function getOfferedWindows(now: Date = new Date()): DeliveryWindow[] {
   const fri = buildWindow(nextCutoffForDow(now, 4), 1); // Jueves 12md -> Viernes
-  const mon = buildWindow(nextCutoffForDow(now, 6), 2); // Sábado 12md -> Lunes
+  const mon = buildWindow(nextCutoffForDow(now, 6), 2); // Sábado 7:30 p. m. -> Lunes
   return [fri, mon].sort((a, b) => a.cutoff.getTime() - b.cutoff.getTime());
 }
 
@@ -84,11 +103,11 @@ export function getOfferedWindows(now: Date = new Date()): DeliveryWindow[] {
  */
 export function windowFromId(id: string): DeliveryWindow | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) return null;
-  const cutoff = new Date(`${id}T${String(HOUR_UTC).padStart(2, "0")}:00:00.000Z`);
-  if (Number.isNaN(cutoff.getTime())) return null;
-  const dow = cutoff.getUTCDay();
-  const offset = dow === 4 ? 1 : dow === 6 ? 2 : 2; // por defecto, entrega 2 días después
-  return buildWindow(cutoff, offset);
+  const day = new Date(`${id}T00:00:00.000Z`); // fecha CR
+  if (Number.isNaN(day.getTime())) return null;
+  const dow = day.getUTCDay();
+  const offset = (CUTOFFS[dow] || DEFAULT_CUTOFF).deliver;
+  return buildWindow(cutoffAt(day, dow), offset);
 }
 
 /**
@@ -135,13 +154,13 @@ export function isOrderingPaused(anchorISO?: string, now: Date = new Date()): bo
 /** Todas las ventanas viernes/lunes en un rango (para reasignar pedidos a mano). Más reciente primero. */
 export function getWindowRange(now: Date = new Date(), backDays = 42, fwdDays = 42): DeliveryWindow[] {
   const out: DeliveryWindow[] = [];
-  const start = new Date(now.getTime() - backDays * 86400000);
+  const cr = toCR(new Date(now.getTime() - backDays * 86400000));
+  const d = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), cr.getUTCDate()));
   const end = now.getTime() + fwdDays * 86400000;
-  const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), HOUR_UTC, 0, 0, 0));
-  while (d.getTime() <= end) {
+  while (fromCR(d).getTime() <= end) {
     const dow = d.getUTCDay();
-    if (dow === 4) out.push(buildWindow(new Date(d), 1)); // Jueves -> Viernes
-    else if (dow === 6) out.push(buildWindow(new Date(d), 2)); // Sábado -> Lunes
+    const c = CUTOFFS[dow];
+    if (c) out.push(buildWindow(cutoffAt(d, dow), c.deliver));
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return out.sort((a, b) => b.cutoff.getTime() - a.cutoff.getTime());

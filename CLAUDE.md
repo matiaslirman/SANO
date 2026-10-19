@@ -26,7 +26,7 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   menú, Sano Market, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
   mismo componente sin selector de día, sin Market y sin countdown.
 - **Hero**: título grande en mayúsculas (Oswald, acento crema en "Y CENAS."), una línea de **precio real**
-  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 12 md · Retiro lunes 19…").
+  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19…"; la hora sale del cierre real de la ventana).
   A la derecha, un **carrusel de platos** (`components/DishCarousel.tsx`): vitrina fija de fotos con el nombre
   incluido en la imagen, en `public/platos/*.webp` (fondo transparente; el orden y los tamaños están en el
   array `DISHES`). **Rota solo de forma continua** (animación CSS en bucle, tira duplicada); se pausa con el
@@ -56,8 +56,10 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - `lib/types.ts` / `lib/defaults.ts` — modelo y semillas.
 
 ### Ventanas de entrega (clave del negocio)
-Dos cierres por semana: **jueves 12 md → entrega viernes** y **sábado 12 md → entrega lunes**
-(`HOUR_UTC=18` = 12 md Costa Rica). El ciclo está **atado al menú**: al guardar el menú en
+Dos cierres por semana: **jueves 12 md → entrega viernes** y **sábado 7:30 p. m. → entrega lunes**
+(tabla `CUTOFFS` en `lib/windows.ts`, en hora CR = UTC-6). El sábado 7:30 p. m. CR ya es domingo 01:30 UTC, por eso
+el `id` de la ventana es la **fecha CR** del cierre (el sábado) y no la fecha UTC: así los pedidos viejos
+(id de sábado) siguen en su ventana. Para mover una hora, tocá solo `CUTOFFS`. El ciclo está **atado al menú**: al guardar el menú en
 Contenido se fija `Settings.menuPublishedAt` y eso congela las dos ventanas de esa semana.
 Un pedido que entra tarde cae en el **ciclo actual**, no en el siguiente.
 Cuando el ciclo cierra y no se publicó menú nuevo, **los pedidos se pausan**
