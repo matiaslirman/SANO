@@ -26,7 +26,7 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   menú, Sano Market, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
   mismo componente sin selector de día, sin Market y sin countdown.
 - **Hero**: título grande en mayúsculas (Oswald, acento crema en "Y CENAS."), una línea de **precio real**
-  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 12 md · Retiro lunes 19…").
+  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19…"; la hora sale del cierre real de la ventana).
   A la derecha, un **carrusel de platos** (`components/DishCarousel.tsx`): vitrina fija de fotos con el nombre
   incluido en la imagen, en `public/platos/*.webp` (fondo transparente; el orden y los tamaños están en el
   array `DISHES`). **Rota solo de forma continua** (animación CSS en bucle, tira duplicada); se pausa con el
@@ -44,7 +44,11 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - **Proteína Extra visible**: si algún plato del menú tiene el extra activo (precio en Contenido), el hero muestra el chip
   "💪 Proteína Extra disponible · desde +₡X" y cada plato lleva su etiqueta. Sin precio configurado no aparece nada.
 - **Pedidos cerrados**: el hero y la tarjeta de pausa ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
-  mensaje escrito; cuenta como evento `menu_alert`).
+  mensaje escrito; cuenta como evento `menu_alert`). La tarjeta muestra chips tocables: **"Esta semana tuvimos"** (el menú
+  que acaba de cerrar, que sigue siendo `settings.menu` hasta publicar otro) y **"Los favoritos"** (top 10 de platos más
+  pedidos de siempre, **solo el nombre**, sin cifras; `lib/favorites.ts` → `topDishes`, datos reales, sin eventos, unidos
+  con `groupDishes` y sin repetir los del menú). Lo que la persona toca se agrega al mensaje de WhatsApp (`menuAlertMessage`).
+  Llega en `PublicStatus.closed` solo cuando el sitio está pausado.
 - **Contadores de uso** (`lib/track.ts`, `POST /api/track`, `store.trackEvent/getTrack`, hash `sano:track`): pop-up de la
   tarjeta (visto / descargar / "Ya la tengo" / "Ahora no") y `menu_alert`. Sin datos personales; se ven en Analítica.
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
@@ -56,8 +60,10 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - `lib/types.ts` / `lib/defaults.ts` — modelo y semillas.
 
 ### Ventanas de entrega (clave del negocio)
-Dos cierres por semana: **jueves 12 md → entrega viernes** y **sábado 12 md → entrega lunes**
-(`HOUR_UTC=18` = 12 md Costa Rica). El ciclo está **atado al menú**: al guardar el menú en
+Dos cierres por semana: **jueves 12 md → entrega viernes** y **sábado 7:30 p. m. → entrega lunes**
+(tabla `CUTOFFS` en `lib/windows.ts`, en hora CR = UTC-6). El sábado 7:30 p. m. CR ya es domingo 01:30 UTC, por eso
+el `id` de la ventana es la **fecha CR** del cierre (el sábado) y no la fecha UTC: así los pedidos viejos
+(id de sábado) siguen en su ventana. Para mover una hora, tocá solo `CUTOFFS`. El ciclo está **atado al menú**: al guardar el menú en
 Contenido se fija `Settings.menuPublishedAt` y eso congela las dos ventanas de esa semana.
 Un pedido que entra tarde cae en el **ciclo actual**, no en el siguiente.
 Cuando el ciclo cierra y no se publicó menú nuevo, **los pedidos se pausan**
@@ -146,6 +152,28 @@ menú y abre el ciclo) → `POST /api/orders`.
 - La lámina crema (`.sheet`) se monta sobre el hero con `margin-top` negativo para que las
   esquinas redondeadas caigan sobre el bordó oscuro (sin franja clara). No romper eso.
 - Estilos públicos en `app/globals.css`; panel en `app/admin/admin.css`.
+
+## Backlog (acordado, sin construir todavía)
+Orden: primero cerrar lo de "Avisame cuando salga el menú" con platos del historial; después lo de abajo.
+
+### Fidelización: tarjeta de 5 sellos (próximo tema)
+Hoy la tarjeta es un wallet-pass de **add2wallet** (`LOYALTY_URL` en `lib/loyalty.ts`) y los sellos los pone el dueño **a
+mano**; desde que los pedidos entran por la plataforma se le olvida sellar. Plan por fases:
+1. **Contador + recordatorio manual (sin API)**: sellos por cliente (reusar `lib/customers.ts`: teléfono manda, nombres
+   casi idénticos se unen), "Falta sellar" en Pedidos al marcar pagado/entregado, marca "sello puesto" por pedido y
+   columna de sellos (x/5) en Analítica → Clientes. Eventos no cuentan.
+2. **Botón "Sellar" que llama a la API de add2wallet** (la plataforma es Basetime a2w; su SDK expone `updatePass` y
+   `redeem`). Server-side (ruta API), con la llave en variable de entorno de Vercel (`ADD2WALLET_API_KEY`, **nunca** en el
+   código ni en el chat). Bloqueo conocido: el link de descarga es genérico, así que hay que poder **vincular cada pase con
+   un cliente** (teléfono/correo/ID de pase) antes de automatizar.
+3. **Automático al marcar pagado**, solo cuando 2 esté probado.
+Reglas por confirmar con el dueño: cuándo suma un sello (¿pagado o entregado? ¿monto mínimo?), qué se gana al completar 5
+y si la tarjeta se reinicia. Necesito: documentación/permisos de la API y cómo identifica la plataforma a cada cliente.
+
+### Otras ideas pendientes de decisión
+- **Combos clickeables** en el menú (meta con barra de progreso "llevás 3 de 10", sin pre-llenar el carrito).
+- **Placeholder de platos** en "Avisame cuando salga el menú": chips con los platos más pedidos del historial real
+  (`groupDishes` sobre pedidos; nunca inventar), que arman el mensaje de WhatsApp.
 
 ## Pendientes del dueño (no son código)
 - Renumerar el pedido de Diego (tocar el N° en Pedidos → 222).

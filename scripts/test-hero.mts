@@ -1,7 +1,7 @@
 // Tests de la línea de cierre, el precio y la regla del contador del hero (lib/hero.ts).
 // Correr con: node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-hero.mts
 import assert from "node:assert/strict";
-import { shouldShowHeroPill, resolveHeroPill, cutoffDayLabel, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "../lib/hero.ts";
+import { shouldShowHeroPill, resolveHeroPill, cutoffDayLabel, cutoffTimeLabel, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "../lib/hero.ts";
 
 // Modo auto: solo a ≤ N horas del cierre, y nunca después de cerrado.
 assert.equal(shouldShowHeroPill("auto", 2, 121, false), false);
@@ -23,14 +23,19 @@ assert.deepEqual(resolveHeroPill({ heroPillMode: "raro" as never, heroPillHours:
 assert.deepEqual(resolveHeroPill({ heroPillHours: 9999 }), { mode: "auto", hours: 72 });
 assert.deepEqual(resolveHeroPill({ heroPillHours: -3 }), { mode: "auto", hours: 2 });
 
-// Día del cierre en hora CR (12 md CR = 18:00 UTC; jueves -> viernes, sábado -> lunes).
+// Día del cierre en hora CR (jueves 12 md = 18:00 UTC; sábado 7:30 p. m. = domingo 01:30 UTC).
 assert.equal(cutoffDayLabel("2026-10-15T18:00:00.000Z"), "jueves");
-assert.equal(cutoffDayLabel("2026-10-17T18:00:00.000Z"), "sábado");
+assert.equal(cutoffDayLabel("2026-10-18T01:30:00.000Z"), "sábado"); // en UTC ya es domingo
 assert.equal(cutoffDayLabel("basura"), "");
 assert.equal(
-  closingLine("2026-10-17T18:00:00.000Z", "Lunes 19 de octubre"),
-  "Pedidos abiertos hasta el sábado 12 md · Retiro lunes 19 de octubre"
+  closingLine("2026-10-18T01:30:00.000Z", "Lunes 19 de octubre"),
+  "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19 de octubre"
 );
+assert.equal(cutoffTimeLabel("2026-10-15T18:00:00.000Z"), "12 md");
+assert.equal(cutoffTimeLabel("2026-10-18T01:30:00.000Z"), "7:30 p. m.");
+assert.equal(cutoffTimeLabel("2026-10-18T02:00:00.000Z"), "8 p. m.");
+assert.equal(cutoffTimeLabel("2026-10-17T15:00:00.000Z"), "9 a. m.");
+assert.equal(cutoffTimeLabel("basura"), "");
 assert.equal(closingLine("2026-10-15T18:00:00.000Z", ""), "Pedidos abiertos hasta el jueves 12 md");
 
 // Línea de precio con los precios reales; sin combos, solo el precio base.

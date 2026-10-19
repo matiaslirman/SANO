@@ -12,6 +12,7 @@ import { DishCarousel } from "./DishCarousel";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
 import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
+import { menuAlertMessage } from "@/lib/favorites";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -55,6 +56,7 @@ export function Ordering({
   const [loyaltyPending, setLoyaltyPending] = useState(false);
   const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [picks, setPicks] = useState<string[]>([]); // platos que la persona quiere que vuelvan (pedidos cerrados)
 
   // ── entrega elegida por el cliente (próximo viernes / próximo lunes) ──
   const [selWinId, setSelWinId] = useState<string>(() => initialStatus.windows[0]?.id || "");
@@ -105,7 +107,8 @@ export function Ordering({
   const extraList = isEvent ? [] : status.menu.map((d) => status.extraPrices?.[d] || 0).filter((p) => p > 0);
   const extraAvail = !paused && extraList.length > 0;
   const extraMin = extraList.length ? Math.min(...extraList) : 0;
-  const menuAlertHref = `https://wa.me/${WA}?text=${encodeURIComponent("Hola Sano 👋 Avisame apenas salga el menú de la próxima semana, por favor.")}`;
+  const menuAlertHref = `https://wa.me/${WA}?text=${encodeURIComponent(menuAlertMessage(picks))}`;
+  const togglePick = (d: string) => setPicks((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const heroPillRef = useRef<HTMLDivElement>(null);
   const [pillShow, setPillShow] = useState(false);
   // ¿Se muestra el contador? Según el modo del panel: siempre / nunca / solo cuando faltan pocas horas para el cierre.
@@ -565,6 +568,34 @@ export function Ordering({
               <div className="pause-kick">Sano</div>
               <h2 className="pause-title">{ORDERS_PAUSED_TITLE}</h2>
               <p className="pause-text">{ORDERS_PAUSED_MESSAGE}</p>
+              {(status.closed?.thisWeek.length || status.closed?.favorites.length) ? (
+                <div className="pause-picks">
+                  <p className="pause-picks-t">Tocá los que querés que vuelvan y te avisamos 👇</p>
+                  {([
+                    ["Esta semana tuvimos", status.closed?.thisWeek || []],
+                    ["Los favoritos", status.closed?.favorites || []],
+                  ] as [string, string[]][]).map(([title, list]) =>
+                    list.length ? (
+                      <div className="pause-group" key={title}>
+                        <div className="pause-group-t">{title}</div>
+                        <div className="pause-chips">
+                          {list.map((d) => (
+                            <button
+                              type="button"
+                              key={d}
+                              className={`pchip${picks.includes(d) ? " on" : ""}`}
+                              aria-pressed={picks.includes(d)}
+                              onClick={() => togglePick(d)}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              ) : null}
               <a
                 className="wa-btn pause-wa"
                 href={menuAlertHref}
@@ -572,7 +603,7 @@ export function Ordering({
                 rel="noopener noreferrer"
                 onClick={() => track("menu_alert")}
               >
-                💬 Avisame cuando salga el menú
+                💬 {picks.length ? `Avisame · ${picks.length} plato${picks.length === 1 ? "" : "s"} elegido${picks.length === 1 ? "" : "s"}` : "Avisame cuando salga el menú"}
               </a>
               <p className="pause-hint">Te escribimos por WhatsApp apenas esté el menú de la semana.</p>
             </div>

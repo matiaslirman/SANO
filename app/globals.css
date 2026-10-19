@@ -415,3 +415,14 @@ footer .fbrand{margin-bottom:12px}
 .pause-wa{max-width:340px;margin:18px auto 0}
 .pause-hint{font-size:13px;color:var(--muted,#7a6a55);margin:10px 0 0}
 @media(max-width:700px){.hero-cta .btn-primary{white-space:normal}}
+
+/* Pedidos cerrados: platos que la persona puede pedir que vuelvan */
+.pause-picks{margin:18px auto 0;max-width:640px;text-align:left}
+.pause-picks-t{margin:0 0 4px;font-size:14px;color:var(--muted,#7a6a55);text-align:center}
+.pause-group{margin-top:14px}
+.pause-group-t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#7a6a55);margin-bottom:8px;text-align:center}
+.pause-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pchip{border:1px solid var(--line-strong,#E7D7B4);background:#fff;color:var(--bordo-ink,#3a0b0c);border-radius:999px;padding:8px 14px;font-family:var(--body);font-size:13.5px;font-weight:600;line-height:1.25;cursor:pointer;text-align:left;transition:background .15s,border-color .15s,color .15s}
+.pchip:hover{border-color:var(--bordo);background:var(--crema-bg,#FBF5E9)}
+.pchip.on{background:var(--bordo);border-color:var(--bordo);color:var(--crema)}
+.pchip.on::before{content:"✓ "}

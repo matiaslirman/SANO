@@ -121,4 +121,6 @@ export interface PublicStatus {
   extraPrices?: Record<DishName, number>;
   /** Contador del hero (ver Settings.heroPillMode). Ausente en el evento. */
   heroPill?: { mode: HeroPillMode; hours: number };
+  /** Solo con los pedidos cerrados: el menú que acaba de cerrar y los favoritos de siempre (nombres, datos reales). */
+  closed?: { thisWeek: DishName[]; favorites: DishName[] };
 }
