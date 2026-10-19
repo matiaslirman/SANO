@@ -36,12 +36,24 @@ export function cutoffDayLabel(cutoffISO: string): string {
   return DIAS[new Date(t - 6 * 3600 * 1000).getUTCDay()];
 }
 
-/** "Pedidos abiertos hasta el sábado 12 md · Retiro lunes 19 de octubre" */
+/** Hora del cierre en hora CR: "12 md" o "7:30 p. m." (según el cierre real de la ventana). */
+export function cutoffTimeLabel(cutoffISO: string): string {
+  const t = new Date(cutoffISO).getTime();
+  if (Number.isNaN(t)) return "";
+  const cr = new Date(t - 6 * 3600 * 1000);
+  const h = cr.getUTCHours();
+  const m = cr.getUTCMinutes();
+  if (h === 12 && m === 0) return "12 md";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "p. m." : "a. m."}`;
+}
+
+/** "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19 de octubre" */
 export function closingLine(cutoffISO: string, deliveryDateLabel: string): string {
   const day = cutoffDayLabel(cutoffISO);
   if (!day) return "";
   const retiro = deliveryDateLabel ? ` · Retiro ${deliveryDateLabel.charAt(0).toLowerCase()}${deliveryDateLabel.slice(1)}` : "";
-  return `Pedidos abiertos hasta el ${day} 12 md${retiro}`;
+  return `Pedidos abiertos hasta el ${day} ${cutoffTimeLabel(cutoffISO)}${retiro}`;
 }
 
 /** "Platos desde ₡5.500 · Combo de 6 por ₡31.000" (con los precios reales del sitio). */
