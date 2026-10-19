@@ -87,6 +87,8 @@ export interface Order {
   windowLabel: string;     // e.g. "Entrega Viernes 19 sep"
   customerName: string;
   whatsapp: string;
+  /** Correo opcional (minúsculas): llave para vincular al cliente con su tarjeta de sellos. */
+  email?: string;
   notes: string;
   dishes: OrderDishLine[];
   market: OrderMarketLine[];

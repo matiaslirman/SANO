@@ -249,7 +249,8 @@ export function AnaliticaView({
         (g.paidTotal ? ` · ${crc(g.paidTotal)}` : "") +
         ` · último: ${new Date(g.lastOrderAt).toLocaleDateString("es-CR", { day: "numeric", month: "short", timeZone: "America/Costa_Rica" })}` +
         (g.variants.length ? ` · incluye: ${g.variants.map((v) => `“${v}”`).join(", ")}` : "") +
-        (g.byPhone ? " · unido por teléfono" : ""),
+        (g.email ? ` · ${g.email}` : "") +
+        (g.byEmail ? " · unido por correo" : g.byPhone ? " · unido por teléfono" : ""),
     }));
     return { rows, customers: groups.length, repeat, merged: groups.reduce((n, g) => n + g.variants.length, 0) };
   }, [orders]);
@@ -435,8 +436,8 @@ export function AnaliticaView({
           <p className="aprod-note">
             {cust.customers} cliente{cust.customers === 1 ? "" : "s"} · {cust.repeat} ya volvieron a pedir (
             {cust.customers ? Math.round((cust.repeat / cust.customers) * 100) : 0}%). Se cuentan <b>todos los pedidos</b>{" "}
-            (pagados y pendientes, sin eventos). Se unen nombres casi idénticos y el mismo teléfono; dos teléfonos
-            distintos nunca se unen
+            (pagados y pendientes, sin eventos). Se une por correo, por teléfono y por nombres casi idénticos; dos correos o dos
+            teléfonos distintos nunca se unen
             {cust.merged > 0 ? ` (${cust.merged} variante${cust.merged > 1 ? "s" : ""} unida${cust.merged > 1 ? "s" : ""})` : ""}.
           </p>
           <RankBars rows={custShown} unit="ped." />

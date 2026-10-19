@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
 import type { TrackEvent } from "./track";
+import { normalizeEmail } from "./contact";
 import { topDishes } from "./favorites";
 
 const K = {
@@ -87,6 +88,7 @@ function redis(): Redis {
 export interface NewOrderInput {
   customerName: string;
   whatsapp?: string;
+  email?: string;
   notes?: string;
   windowId?: string; // entrega elegida por el cliente (una de las ofrecidas)
   dishes: { name: string; qty: number; extraQty?: number }[];
@@ -291,6 +293,7 @@ export const store = {
       windowLabel: win.shortLabel,
       customerName: (input.customerName || "").slice(0, 80).trim() || "Cliente",
       whatsapp: (input.whatsapp || "").slice(0, 40).trim(),
+      ...(normalizeEmail(input.email) ? { email: normalizeEmail(input.email) } : {}),
       notes: (input.notes || "").slice(0, 500).trim(),
       dishes,
       market: marketLines,
