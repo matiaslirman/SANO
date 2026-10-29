@@ -8,7 +8,7 @@ import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 import { loyaltyDone } from "@/lib/loyalty";
 import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
-import { DishCarousel } from "./DishCarousel";
+import { HeroStrip } from "./HeroStrip";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
 import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
@@ -419,7 +419,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className={`wrap${isEvent ? "" : " wrap-dishes"}`}>
+        <div className={`wrap${isEvent ? "" : " hero-wrap-solo"}`}>
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -474,7 +474,7 @@ export function Ordering({
                     @sanoby22bistro
                   </span>
                   <span className="sep" />
-                  <span>+2.000 platos vendidos</span>
+                  <span>22 Bistro · 4,8★ en Google</span>
                   <span className="sep trust-extra" />
                   <span className="trust-extra">Atención personalizada 1 a 1</span>
                 </div>
@@ -517,16 +517,16 @@ export function Ordering({
             )}
           </div>
 
-          {isEvent ? (
-            /* SELLO — recurso de marca oficial (lib/brand · Seal) */
+          {/* SELLO — recurso de marca oficial (lib/brand · Seal). Solo en el evento. */}
+          {isEvent && (
             <div className="hero-visual" aria-hidden="true">
               <Seal className="hero-seal" />
             </div>
-          ) : (
-            /* Carrusel de platos (la tarjeta de cliente frecuente pasó a un pop-up tras el pedido) */
-            <DishCarousel />
           )}
         </div>
+
+        {/* VITRINA — tira de platos reales que corre en bucle a todo el ancho (solo en el hero público) */}
+        {!isEvent && <HeroStrip />}
       </section>
 
       {/* ============ SHEET ============ */}
