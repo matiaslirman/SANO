@@ -474,7 +474,7 @@ export function Ordering({
                     @sanoby22bistro
                   </span>
                   <span className="sep" />
-                  <span>+2.000 platos vendidos</span>
+                  <span>22 Bistro · 4,8★ en Google</span>
                   <span className="sep trust-extra" />
                   <span className="trust-extra">Atención personalizada 1 a 1</span>
                 </div>
