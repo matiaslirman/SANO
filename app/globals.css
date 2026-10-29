@@ -93,6 +93,21 @@ img,svg{max-width:100%}
 .hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
 @keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
 
+/* VITRINA del hero: tira de platos reales a todo el ancho, en bucle continuo (táperes sobre fondo transparente) */
+.hero .wrap.hero-wrap-solo{grid-template-columns:1fr;padding-block:28px 18px}
+.hstrip{width:100%;overflow:hidden;margin-top:14px;padding-bottom:46px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%)}
+.hstrip-rail{display:flex;align-items:center;width:max-content;animation:hstripSlide 55s linear infinite;will-change:transform}
+.hstrip-rail.hold{animation-play-state:paused}
+.hstrip-rail img{display:block;height:clamp(200px,26vw,300px);width:auto;user-select:none;-webkit-user-drag:none}
+@keyframes hstripSlide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* "Reducir movimiento": sin animación; una sola tira que se desliza a mano */
+@media (prefers-reduced-motion:reduce){
+  .hstrip{overflow-x:auto;scrollbar-width:none}
+  .hstrip::-webkit-scrollbar{display:none}
+  .hstrip-rail{animation:none!important}
+  .hstrip-rail img:nth-child(2){display:none}
+}
+
 /* pop-up de la tarjeta de cliente frecuente (al volver de WhatsApp) */
 .lp-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(20,4,4,.7);backdrop-filter:blur(3px);animation:lpFade .2s ease-out}
 .lp-card{position:relative;width:min(420px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,var(--bordo),var(--bordo-deep,#6e1213));border:1px solid rgba(255,241,180,.25);border-radius:20px;padding:26px 22px 20px;text-align:center;color:var(--crema);box-shadow:0 30px 80px -20px rgba(0,0,0,.7);animation:lpPop .25s ease-out}

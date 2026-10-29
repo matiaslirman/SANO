@@ -27,12 +27,13 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   mismo componente sin selector de día, sin Market y sin countdown.
 - **Hero**: título grande en mayúsculas (Oswald, acento crema en "Y CENAS."), una línea de **precio real**
   (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19…"; la hora sale del cierre real de la ventana).
-  A la derecha, un **carrusel de platos** (`components/DishCarousel.tsx`): vitrina fija de fotos con el nombre
-  incluido en la imagen, en `public/platos/*.webp` (fondo transparente; el orden y los tamaños están en el
-  array `DISHES`). **Rota solo de forma continua** (animación CSS en bucle, tira duplicada); se pausa con el
-  mouse o al mantener el dedo; con "reducir movimiento" queda una tira que se desliza a mano.
-  Para cambiar una foto, pisá el `.webp` (idealmente exportado @2x/@3x desde Figma). En modo evento va el sello
-  y el hero no cambia.
+  Debajo del texto, a **todo el ancho**, una **vitrina de platos reales** (`components/HeroStrip.tsx`): la
+  composición `public/platos/vitrina-sano.webp` (táperes sobre fondo transparente, con sombra suave) que corre
+  en **bucle continuo** (animación CSS: la imagen se duplica y se desplaza exactamente una copia con
+  `translateX -50%`, así el loop no tiene salto); extremos con degradé de desvanecido; se pausa con el mouse o
+  al mantener el dedo; con "reducir movimiento" queda una tira que se desliza a mano. Para cambiar la vitrina,
+  pisá el `.webp` (export transparente @2x desde Figma). En **modo evento** no va la vitrina sino el **sello**
+  (`lib/brand · Seal`) a la derecha del texto.
 - **Contador del hero** ("Cierra en…" + cupos): lo gobierna `Settings.heroPillMode` (`auto` | `siempre` |
   `nunca`) y `heroPillHours`, editables en **Contenido → Contador del hero**. Por defecto `auto`: solo aparece
   cuando faltan **2 h o menos** para el cierre (y se esconde al cerrar); la pill flotante sigue la misma regla.

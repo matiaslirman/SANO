@@ -8,6 +8,7 @@ import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 import { loyaltyDone } from "@/lib/loyalty";
 import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
+import { HeroStrip } from "./HeroStrip";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
 import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
@@ -418,7 +419,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className="wrap">
+        <div className={`wrap${isEvent ? "" : " hero-wrap-solo"}`}>
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -516,11 +517,16 @@ export function Ordering({
             )}
           </div>
 
-          {/* SELLO — recurso de marca oficial (lib/brand · Seal). Antes acá iba el carrusel de fotos. */}
-          <div className="hero-visual" aria-hidden="true">
-            <Seal className="hero-seal" />
-          </div>
+          {/* SELLO — recurso de marca oficial (lib/brand · Seal). Solo en el evento. */}
+          {isEvent && (
+            <div className="hero-visual" aria-hidden="true">
+              <Seal className="hero-seal" />
+            </div>
+          )}
         </div>
+
+        {/* VITRINA — tira de platos reales que corre en bucle a todo el ancho (solo en el hero público) */}
+        {!isEvent && <HeroStrip />}
       </section>
 
       {/* ============ SHEET ============ */}
