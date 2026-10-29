@@ -68,7 +68,6 @@ img,svg{max-width:100%}
 .hero h1{font-size:clamp(1.95rem,4.2vw,3.05rem);color:var(--crema);font-weight:600;letter-spacing:.005em;line-height:1.02}
 .hero h1 em{font-style:normal;color:#fff}
 /* sitio normal: título grande en mayúsculas (como los títulos de sección), acento crema; columna de fotos más ancha */
-.hero .wrap-dishes{grid-template-columns:1fr 1.15fr;gap:34px}
 .hero h1.hero-title{font-size:clamp(2.2rem,4.2vw,3.25rem);text-transform:uppercase;letter-spacing:.012em;line-height:.98;font-weight:700;color:#fff}
 .hero h1.hero-title em{color:var(--crema)}
 .hero-meta{display:flex;flex-direction:column;gap:5px;margin-top:16px}
@@ -93,22 +92,6 @@ img,svg{max-width:100%}
 .hero-visual{display:grid;place-items:center;min-height:230px}
 .hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
 @keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
-
-/* carrusel de platos en el hero: rota solo, de forma continua y lenta (fotos con el nombre incluido; fondo transparente) */
-.dcar{display:flex;flex-direction:column;align-items:center;gap:12px;justify-self:center;width:100%;max-width:100%;min-width:0}
-.dcar-marquee{width:100%;min-width:0;overflow:hidden;padding:6px 0 10px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 7%,#000 93%,transparent 100%)}
-.dcar-rail{display:flex;align-items:flex-end;width:max-content;animation:dcarSlide 40s linear infinite;will-change:transform}
-.dcar-rail.hold{animation-play-state:paused}
-.dcar-item{flex:0 0 auto;margin:0 18px 0 0}
-.dcar-item img{display:block;height:310px;width:auto;user-select:none;-webkit-user-drag:none}
-@keyframes dcarSlide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-/* "Reducir movimiento": sin animación; una sola tira que se desliza a mano */
-@media (prefers-reduced-motion:reduce){
-  .dcar-marquee{overflow-x:auto;scrollbar-width:none}
-  .dcar-marquee::-webkit-scrollbar{display:none}
-  .dcar-rail{animation:none!important}
-  .dcar-item[aria-hidden="true"]{display:none}
-}
 
 /* pop-up de la tarjeta de cliente frecuente (al volver de WhatsApp) */
 .lp-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(20,4,4,.7);backdrop-filter:blur(3px);animation:lpFade .2s ease-out}
@@ -355,10 +338,6 @@ footer .fbrand{margin-bottom:12px}
   .market{margin-top:28px}
   .checkout{margin-top:28px}
   .sheet{padding-top:30px;padding-bottom:32px}
-  /* carrusel de platos: bajo el texto, más compacto */
-  .dcar{gap:10px;margin-top:4px}
-  .dcar-item img{height:250px}
-  .dcar-item{margin-right:14px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 

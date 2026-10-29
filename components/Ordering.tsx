@@ -8,7 +8,6 @@ import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 import { loyaltyDone } from "@/lib/loyalty";
 import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
-import { DishCarousel } from "./DishCarousel";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
 import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
@@ -419,7 +418,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className={`wrap${isEvent ? "" : " wrap-dishes"}`}>
+        <div className="wrap">
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -517,15 +516,10 @@ export function Ordering({
             )}
           </div>
 
-          {isEvent ? (
-            /* SELLO — recurso de marca oficial (lib/brand · Seal) */
-            <div className="hero-visual" aria-hidden="true">
-              <Seal className="hero-seal" />
-            </div>
-          ) : (
-            /* Carrusel de platos (la tarjeta de cliente frecuente pasó a un pop-up tras el pedido) */
-            <DishCarousel />
-          )}
+          {/* SELLO — recurso de marca oficial (lib/brand · Seal). Antes acá iba el carrusel de fotos. */}
+          <div className="hero-visual" aria-hidden="true">
+            <Seal className="hero-seal" />
+          </div>
         </div>
       </section>
 
