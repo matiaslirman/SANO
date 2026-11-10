@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { Settings, MarketCategory, ComboTier, EventSettings, MonthlyIncome, HeroPillMode } from "@/lib/types";
 import { crc } from "@/lib/format";
+import { MenuArt, type ArtFormat } from "@/components/MenuArt";
 
 function Saved({ show }: { show: boolean }) {
   if (!show) return null;
@@ -13,16 +14,48 @@ export function ContentEditor({
   initialSettings,
   initialMarket,
   initialEvent,
+  defaultDateA,
+  defaultDateB,
 }: {
   initialSettings: Settings;
   initialMarket: MarketCategory[];
   initialEvent: EventSettings;
+  defaultDateA: string;
+  defaultDateB: string;
 }) {
   // ── Menú ──
   const [menu, setMenu] = useState<string[]>(initialSettings.menu);
   const [weekLabel, setWeekLabel] = useState(initialSettings.weekLabel);
   const [savedMenu, setSavedMenu] = useState(false);
   const [busyMenu, setBusyMenu] = useState(false);
+
+  // ── Artes del menú (Instagram) ──
+  const [dateA, setDateA] = useState(defaultDateA);
+  const [dateB, setDateB] = useState(defaultDateB);
+  const [busyArt, setBusyArt] = useState<ArtFormat | null>(null);
+  const postRef = useRef<HTMLDivElement>(null);
+  const storyRef = useRef<HTMLDivElement>(null);
+  // Platos limpios para el arte (sin vacíos), en vivo según lo que se está editando arriba.
+  const artDishes = menu.map((m) => m.trim()).filter(Boolean);
+
+  async function downloadArt(format: ArtFormat) {
+    const node = format === "post" ? postRef.current : storyRef.current;
+    if (!node) return;
+    setBusyArt(format);
+    try {
+      // html-to-image es solo de navegador: se importa en el click para no cargarlo de más.
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `sano-menu-${format === "post" ? "feed" : "story"}.png`;
+      a.click();
+    } catch {
+      alert("No se pudo generar el arte. Probá de nuevo.");
+    } finally {
+      setBusyArt(null);
+    }
+  }
 
   // ── Contador del hero ──
   const [heroMode, setHeroMode] = useState<HeroPillMode>(initialSettings.heroPillMode ?? "auto");
@@ -253,6 +286,69 @@ export function ContentEditor({
             {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
           </button>
           <Saved show={savedMenu} />
+        </div>
+      </div>
+
+      {/* ARTES DEL MENÚ (Instagram) */}
+      <div className="editcard">
+        <h3>Artes del menú (Instagram)</h3>
+        <div className="sub">
+          Generá las dos imágenes del menú para postear: <b>feed</b> (1080×1350) y <b>story</b> (1080×1920).
+          Usan los <b>platos de arriba</b> (lo que edités se refleja al toque) y el rango de fechas de abajo.
+        </div>
+        <div className="cupos-edit">
+          <div className="field">
+            <label>Fecha de inicio</label>
+            <input value={dateA} onChange={(e) => setDateA(e.target.value)} placeholder="26 OCT" />
+          </div>
+          <div className="field">
+            <label>Fecha de fin</label>
+            <input value={dateB} onChange={(e) => setDateB(e.target.value)} placeholder="2 NOVIEMBRE" />
+          </div>
+        </div>
+
+        {/* Vista previa (feed, a escala) */}
+        <div style={{ marginTop: 6, marginBottom: 12 }}>
+          <div
+            style={{
+              width: 320,
+              height: 400,
+              overflow: "hidden",
+              borderRadius: 12,
+              boxShadow: "0 8px 22px rgba(0,0,0,.2)",
+            }}
+          >
+            <div style={{ width: 1080, height: 1350, transform: "scale(0.2963)", transformOrigin: "top left" }}>
+              <MenuArt format="post" dishes={artDishes} dateA={dateA} dateB={dateB} />
+            </div>
+          </div>
+          <div className="sub" style={{ marginTop: 6, marginBottom: 0 }}>
+            Vista previa del feed. La story usa los mismos datos, más alta.
+          </div>
+        </div>
+
+        <div>
+          <button className="save-btn" onClick={() => downloadArt("post")} disabled={busyArt !== null}>
+            {busyArt === "post" ? "Generando…" : "Descargar feed (1080×1350)"}
+          </button>
+          <button
+            className="obtn"
+            style={{ marginLeft: 10 }}
+            onClick={() => downloadArt("story")}
+            disabled={busyArt !== null}
+          >
+            {busyArt === "story" ? "Generando…" : "Descargar story (1080×1920)"}
+          </button>
+        </div>
+
+        {/* Copias a tamaño real, fuera de pantalla, para exportar a PNG */}
+        <div aria-hidden style={{ position: "fixed", left: -20000, top: 0, pointerEvents: "none" }}>
+          <div ref={postRef} style={{ display: "inline-block" }}>
+            <MenuArt format="post" dishes={artDishes} dateA={dateA} dateB={dateB} />
+          </div>
+          <div ref={storyRef} style={{ display: "inline-block" }}>
+            <MenuArt format="story" dishes={artDishes} dateA={dateA} dateB={dateB} />
+          </div>
         </div>
       </div>
 
