@@ -1,0 +1,116 @@
+/* Arte del menú para Instagram (feed 1080×1350 y story 1080×1920). Reproduce la plantilla de marca:
+   header bordó (crema + blanco), sello arriba a la derecha, lámina crema con la lista numerada,
+   divisores dorados y el tenedor entrando desde el margen izquierdo. Tamaños en px fijos: el arte
+   se exporta a PNG con html-to-image, así que no debe depender del layout responsive del panel. */
+
+.art {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  color: #171012;
+  font-family: var(--font-oswald), "Oswald", system-ui, sans-serif;
+  background: radial-gradient(120% 80% at 50% -10%, #a52122 0%, #921a1b 34%, #6e1213 72%, #560e0f 100%);
+  display: flex;
+  flex-direction: column;
+}
+.art * { box-sizing: border-box; }
+/* viñeta sutil en los bordes */
+.art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 220px rgba(45, 7, 8, 0.55);
+}
+.post { width: 1080px; height: 1350px; padding: 40px 38px 0; }
+.story { width: 1080px; height: 1920px; padding: 46px 44px 0; }
+
+.header {
+  position: relative;
+  z-index: 2;
+  background: #921a1b;
+  box-shadow: 0 18px 40px rgba(40, 6, 7, 0.4);
+  border: 1px solid rgba(255, 241, 180, 0.14);
+}
+.post .header { border-radius: 26px; padding: 34px 188px 38px 42px; }
+.story .header { border-radius: 30px; padding: 40px 200px 44px 46px; }
+
+.title {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.008em;
+  line-height: 0.97;
+  white-space: nowrap;
+  color: #fff;
+}
+.title .cream { color: #fff1b4; }
+.post .title { font-size: 47px; }
+.story .title { font-size: 52px; }
+
+.date { font-weight: 700; letter-spacing: 0.012em; line-height: 1.02; color: #fff; }
+.date .cream { color: #fff1b4; }
+.post .date { margin-top: 10px; font-size: 46px; }
+.story .date { margin-top: 12px; font-size: 50px; }
+
+.seal {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: auto;
+  filter: drop-shadow(0 10px 20px rgba(30, 4, 5, 0.45));
+}
+.post .seal { right: 30px; width: 168px; }
+.story .seal { right: 34px; width: 188px; }
+
+.sheet {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  background: #fbf5e9;
+  box-shadow: 0 20px 50px rgba(40, 6, 7, 0.3);
+  display: flex;
+}
+.post .sheet { border-radius: 30px; margin-top: 24px; margin-bottom: 150px; padding: 22px 48px 34px; }
+.story .sheet { border-radius: 34px; margin-top: 30px; margin-bottom: 188px; padding: 30px 56px 40px; }
+
+.dishes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; width: 100%; }
+.dishes li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid #e7d49c;
+}
+.dishes li:last-child { border-bottom: none; }
+.post .dishes li { gap: 18px; }
+.story .dishes li { gap: 22px; }
+
+.num { color: #921a1b; font-weight: 700; flex: 0 0 auto; }
+.post .num { font-size: 34px; }
+.story .num { font-size: 40px; }
+
+.name {
+  color: #921a1b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.006em;
+  line-height: 1.04;
+}
+.post .name { font-size: 31px; }
+.story .name { font-size: 37px; }
+
+/* El tenedor entra desde el margen izquierdo (el mango sangra fuera del borde) y descansa en la franja inferior.
+   El mask-image (data-URI) se setea inline en el componente. */
+.fork {
+  position: absolute;
+  z-index: 0;
+  background: #921a1b;
+  aspect-ratio: 1248 / 372;
+  mask-repeat: no-repeat;
+  mask-position: left center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: left center;
+  -webkit-mask-size: contain;
+}
+.post .fork { bottom: 10px; left: -118px; width: 580px; }
+.story .fork { bottom: 14px; left: -140px; width: 660px; }
