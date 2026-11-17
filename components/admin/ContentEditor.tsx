@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import type { Settings, MarketCategory, ComboTier, EventSettings, MonthlyIncome, HeroPillMode } from "@/lib/types";
 import { crc } from "@/lib/format";
 import { MenuArt, type ArtFormat } from "@/components/MenuArt";
+import { normalizeDish, sameDish } from "@/lib/dishes";
 
 function Saved({ show }: { show: boolean }) {
   if (!show) return null;
@@ -16,12 +17,14 @@ export function ContentEditor({
   initialEvent,
   defaultDateA,
   defaultDateB,
+  dishHistory,
 }: {
   initialSettings: Settings;
   initialMarket: MarketCategory[];
   initialEvent: EventSettings;
   defaultDateA: string;
   defaultDateB: string;
+  dishHistory: string[];
 }) {
   // ── Menú ──
   const [menu, setMenu] = useState<string[]>(initialSettings.menu);
@@ -55,6 +58,58 @@ export function ContentEditor({
     } finally {
       setBusyArt(null);
     }
+  }
+
+  // ── Historial de platos (para volver a incluirlos sin armar todo de cero) ──
+  // Platos de semanas anteriores (datos reales, sin eventos). Se ocultan los que ya están en el menú en vivo.
+  const suggestions = dishHistory.filter(
+    (h) => !menu.some((m) => m.trim() && sameDish(normalizeDish(m), normalizeDish(h)))
+  );
+  function addDishFromHistory(name: string) {
+    setMenu((m) => [...m, name]);
+    setMenuExtra((x) => [...x, ""]);
+  }
+
+  // ── Copys para Instagram (para copiar y pegar) ──
+  const [copied, setCopied] = useState<"feed" | "story" | null>(null);
+  const dateLine = dateA && dateB ? `${dateA} / ${dateB}` : dateA || dateB;
+  const feedCopy = useMemo(() => {
+    const list = menu.map((m) => m.trim()).filter(Boolean).map((d, i) => `${i + 1}. ${d}`).join("\n");
+    const lines = [
+      "🍽️ MENÚ DE LA CHEF · Platos listos",
+      dateLine ? `📅 Pedí ahora · entrega ${dateLine}` : "📅 Pedí ahora",
+      "",
+      "Esta semana:",
+      list,
+      "",
+      "Platos de chef listos para retirar 🔥 Elegí los tuyos y coordinás todo por WhatsApp en un minuto 📲",
+      "👉 Pedí en el link de la bio",
+      "Cocina de 22 Bistro · Ciudad Colón 🇨🇷",
+      "",
+      "#SanoBy22Bistro #22Bistro #CiudadColón #PlatosListos #ComidaDeChef #MealPrep #ComidaSana #CostaRica",
+    ];
+    return lines.join("\n");
+  }, [menu, dateLine]);
+  const storyCopy = useMemo(() => {
+    const lines = ["🍽️ Menú de la semana · Platos listos"];
+    if (dateLine) lines.push(`📅 Entrega ${dateLine}`);
+    lines.push("", "Elegí tus platos y pedí por WhatsApp 📲", "👉 Deslizá para pedir");
+    return lines.join("\n");
+  }, [dateLine]);
+
+  async function copyText(text: string, which: "feed" | "story") {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopied(which);
+    setTimeout(() => setCopied((c) => (c === which ? null : c)), 1600);
   }
 
   // ── Contador del hero ──
@@ -281,6 +336,29 @@ export function ContentEditor({
         <button className="obtn" style={{ marginTop: 12 }} onClick={() => { setMenu((m) => [...m, ""]); setMenuExtra((x) => [...x, ""]); }}>
           + Agregar plato
         </button>
+
+        {suggestions.length > 0 && (
+          <div className="hist">
+            <div className="klabel">Volver a incluir del historial · tocá para agregar</div>
+            <div className="chips">
+              {suggestions.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="chip"
+                  onClick={() => addDishFromHistory(name)}
+                  title={`Agregar al menú: ${name}`}
+                >
+                  <span className="chip-plus" aria-hidden="true">+</span> {name}
+                </button>
+              ))}
+            </div>
+            <div className="sub" style={{ marginTop: 8, marginBottom: 0 }}>
+              Platos de semanas anteriores (los más pedidos primero). No inventa nada: salen de pedidos reales.
+            </div>
+          </div>
+        )}
+
         <div>
           <button className="save-btn" onClick={saveMenu} disabled={busyMenu}>
             {busyMenu ? "Guardando…" : "Guardar menú y abrir la semana"}
@@ -339,6 +417,27 @@ export function ContentEditor({
           >
             {busyArt === "story" ? "Generando…" : "Descargar story (1080×1920)"}
           </button>
+        </div>
+
+        {/* Copys listos para copiar y pegar */}
+        <div className="copy-grid">
+          <div className="field">
+            <label>Copy para la publicación (feed)</label>
+            <textarea className="copy-ta" readOnly rows={12} value={feedCopy} onFocus={(e) => e.currentTarget.select()} />
+            <button className="obtn" style={{ marginTop: 8 }} onClick={() => copyText(feedCopy, "feed")}>
+              {copied === "feed" ? "✓ Copiado" : "Copiar copy del feed"}
+            </button>
+          </div>
+          <div className="field">
+            <label>Copy para la historia</label>
+            <textarea className="copy-ta" readOnly rows={6} value={storyCopy} onFocus={(e) => e.currentTarget.select()} />
+            <button className="obtn" style={{ marginTop: 8 }} onClick={() => copyText(storyCopy, "story")}>
+              {copied === "story" ? "✓ Copiado" : "Copiar copy de la historia"}
+            </button>
+          </div>
+        </div>
+        <div className="sub" style={{ marginTop: 10, marginBottom: 0 }}>
+          Los copys salen del menú y las fechas de arriba. Editá los platos o el rango y se actualizan solos.
         </div>
 
         {/* Copias a tamaño real, fuera de pantalla, para exportar a PNG */}

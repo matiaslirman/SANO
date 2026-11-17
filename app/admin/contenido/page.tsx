@@ -2,6 +2,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ContentEditor } from "@/components/admin/ContentEditor";
 import { store } from "@/lib/store";
 import { getCycleWindows } from "@/lib/windows";
+import { groupDishes } from "@/lib/dishes";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,14 @@ export default async function ContenidoPage() {
   const defaultDateA = wins[0] ? artDate(wins[0].deliveryDateLabel) : "";
   const defaultDateB = wins.length ? artDate(wins[wins.length - 1].deliveryDateLabel) : "";
 
+  // Historial de platos de semanas anteriores (datos reales, sin eventos): los más pedidos primero,
+  // nombres agrupados (une tildes/mayúsculas/typos). Sirve para volver a incluirlos sin armar todo de cero.
+  const orders = await store.listOrders();
+  const items = orders
+    .filter((o) => !o.eventId)
+    .flatMap((o) => o.dishes.map((d) => ({ name: d.name, qty: d.qty })));
+  const dishHistory = groupDishes(items, settings.menu).map((g) => g.name).slice(0, 40);
+
   return (
     <AdminShell active="contenido" title="Contenido">
       <ContentEditor
@@ -31,6 +40,7 @@ export default async function ContenidoPage() {
         initialEvent={event}
         defaultDateA={defaultDateA}
         defaultDateB={defaultDateB}
+        dishHistory={dishHistory}
       />
     </AdminShell>
   );
