@@ -93,6 +93,10 @@ El **correo** (`email`, opcional, minúsculas; `lib/contact.ts`) vincula al clie
   producción por plato, platos y Market más vendidos, y el **ingreso por mes** (filtro por mes + histórico del negocio).
 - **Contenido** — menú semanal (guardar = abrir la semana), cupos, precios y combos,
   Proteína Extra, Sano Market, Evento privado e **Ingreso histórico**.
+  - **Historial de platos** en el editor del menú: chips "Volver a incluir" con los platos de semanas
+    anteriores (pedidos reales, sin eventos, agrupados con `groupDishes` y ordenados por más pedidos; se calcula
+    en `app/admin/contenido/page.tsx` y se pasa como `dishHistory`). Tocar un chip agrega el plato al menú en
+    vivo; los que ya están en el menú no se ofrecen (match con `sameDish`). No inventa nada.
   - **Artes del menú (Instagram)**: genera 2 imágenes del menú para postear —**feed** 1080×1350 y **story**
     1080×1920— con la plantilla de marca (`components/MenuArt.tsx` + `MenuArt.module.css`): header bordó,
     sello (`lib/brand · Seal`), lámina crema con la lista numerada y el **tenedor** (`public/brand/icon-tenedor.svg`,
@@ -100,6 +104,8 @@ El **correo** (`email`, opcional, minúsculas; `lib/contact.ts`) vincula al clie
     editor; el rango de fechas se prefija del ciclo (`getCycleWindows`) y es editable. La descarga a PNG es
     client-side con **html-to-image** (`toPng`, `pixelRatio:2`). Para cambiar el tenedor, pisá el `.webp`/svg y
     regenerá `lib/menuArtFork.ts` (`base64 -w0 public/brand/icon-tenedor.svg`).
+  - **Copys para Instagram**: debajo de los artes, dos textos listos para **copiar y pegar** (feed y story),
+    generados del menú + rango de fechas (botón "Copiar", `navigator.clipboard`). Se actualizan solos al editar.
 
 ### Ingreso por mes (`lib/months.ts` + `Settings.history`)
 En **Analítica** el ingreso de cada mes son los pedidos **pagados** agrupados por la **fecha del pedido

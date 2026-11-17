@@ -244,3 +244,17 @@
 .ins-fact{font-weight:600;color:var(--bordo-ink);line-height:1.35}
 .ins-act{font-size:13.5px;color:var(--muted);margin-top:6px;line-height:1.4}
 @media(max-width:700px){.ins-grid{grid-template-columns:1fr}}
+
+/* Historial de platos (volver a incluir sin armar todo de cero) */
+.hist{margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:#fff;color:var(--ink);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s}
+.chip:hover{background:var(--crema-bg);border-color:var(--bordo)}
+.chip .chip-plus{color:var(--bordo);font-weight:800;font-size:15px;line-height:1}
+
+/* Copys para Instagram (copiar y pegar) */
+.copy-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+@media(max-width:760px){.copy-grid{grid-template-columns:1fr}}
+.copy-grid .field label{display:block;font-size:12.5px;font-weight:700;color:var(--bordo-ink);margin-bottom:6px}
+.copy-ta{width:100%;border:1px solid var(--line-strong);border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.5;background:var(--paper);color:var(--ink);resize:vertical;font-family:var(--body)}
+.copy-ta:focus{outline:2px solid var(--bordo);outline-offset:1px}
