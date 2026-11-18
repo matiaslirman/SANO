@@ -47,3 +47,27 @@ assert.equal(
 );
 
 console.log("favorites: OK");
+
+// ── «Más pedido»: solo con datos reales y suficientes ──
+import { popularInMenu, POPULAR_MIN_ORDERS, POPULAR_MIN_QTY } from "../lib/favorites.ts";
+const menu = ["Lasaña Boloñesa", "Pechuga Cordon Bleu con Puré", "Crepa de Espinaca y Hongos", "Costilla 22Bistro con Arroz"];
+const many = (name: string, qty: number, times: number) => Array.from({ length: times }, () => o([[name, qty]]));
+// Pocos pedidos: no se etiqueta nada (sería ruido, no dato).
+assert.deepEqual(popularInMenu(many("Lasaña Boloñesa", 3, POPULAR_MIN_ORDERS - 1), menu), []);
+// Con suficientes: los 2 más pedidos del menú, en orden de cantidad.
+const hist = [
+  ...many("Lasaña Boloñesa", 2, 6),                       // 12
+  ...many("Pechuga Cordon Bleu con Puré", 1, 9),          // 9
+  ...many("Crepa de Espinaca y Hongos", 1, 3),            // 3 → no llega al mínimo
+  ...many("Plato que ya no está en el menú", 5, 8),       // 40, pero no es de este menú
+  o([["Costilla 22Bistro con Arroz", 99]], "evt-x"),      // eventos no cuentan
+];
+assert.ok(hist.length >= POPULAR_MIN_ORDERS);
+assert.deepEqual(popularInMenu(hist, menu), ["Lasaña Boloñesa", "Pechuga Cordon Bleu con Puré"]);
+assert.deepEqual(popularInMenu(hist, menu, 1), ["Lasaña Boloñesa"]);
+// Une escrituras casi idénticas y devuelve el nombre tal como está en el menú.
+const conTilde = [...hist, ...many("Pechuga Cordon Bleu con Pure", 4, 2)]; // tilde distinta: 9 + 8 = 17 → pasa a ser la más pedida
+assert.deepEqual(popularInMenu(conTilde, menu)[0], "Pechuga Cordon Bleu con Puré");
+// Mínimo de unidades por plato.
+assert.deepEqual(popularInMenu([...many("Crepa de Espinaca y Hongos", 1, POPULAR_MIN_QTY - 1), ...many("Otro", 1, 30)], menu), []);
+console.log("favorites (popularInMenu): OK");

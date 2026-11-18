@@ -33,3 +33,32 @@ export function menuAlertMessage(picks: string[]): string {
   const names = picks.map((p) => p.trim()).filter(Boolean);
   return names.length ? `${base} Me encantaría que vuelvan: ${names.join(", ")}.` : base;
 }
+
+/** Por debajo de esta cantidad de pedidos no se etiqueta ningún plato como «Más pedido» (sería ruido, no dato). */
+export const POPULAR_MIN_ORDERS = 20;
+/** Un plato necesita al menos estas unidades pedidas de siempre para merecer la etiqueta. */
+export const POPULAR_MIN_QTY = 5;
+
+/**
+ * Los platos de ESTE menú que más se pidieron de siempre (hasta `n`), para la etiqueta «Más pedido».
+ * Datos reales: cuenta pedidos pagados y pendientes sin eventos, une escrituras casi idénticas y exige un mínimo
+ * de pedidos y de unidades; si no se llega, no se etiqueta nada. Devuelve los nombres tal como están en el menú.
+ */
+export function popularInMenu(orders: OrderLike[], menu: string[], n: number = 2): string[] {
+  const weekly = orders.filter((o) => !o.eventId);
+  if (weekly.length < POPULAR_MIN_ORDERS) return [];
+  const groups = groupDishes(
+    weekly.flatMap((o) => o.dishes.map((d) => ({ name: d.name, qty: d.qty }))),
+    menu
+  );
+  return menu
+    .map((m, i) => {
+      const key = normalizeDish(m);
+      const g = groups.find((x) => sameDish(normalizeDish(x.name), key));
+      return { m, i, qty: g?.qty || 0 };
+    })
+    .filter((x) => x.qty >= POPULAR_MIN_QTY)
+    .sort((a, b) => b.qty - a.qty || a.i - b.i)
+    .slice(0, n)
+    .map((x) => x.m);
+}

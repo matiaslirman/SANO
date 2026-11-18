@@ -51,6 +51,8 @@ export function SiteFooter() {
           <a className="flink" href="https://instagram.com/sanoby22bistro" target="_blank" rel="noopener noreferrer">
             @sanoby22bistro
           </a>
+          <p style={{ marginTop: 10 }}>22 Bistro · 4,8★ en Google</p>
+          <p>Atención personalizada 1 a 1</p>
           <p style={{ marginTop: 10 }}>Moneda: colones (CRC)</p>
         </div>
       </div>
