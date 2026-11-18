@@ -25,14 +25,15 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 - `components/Ordering.tsx` — **todo el flujo de pedido del cliente** (hero, menú, Sano Market,
   "Tu retiro" con el día, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
   mismo componente sin día de retiro, sin Market, sin tarjetas de Viaje Sano y sin countdown.
-- **Hero** (centrado): título grande en mayúsculas (Oswald, acento crema en "Y CENAS.") y **dos tarjetas tocables**
-  (`.tiles` en `Ordering.tsx`): **"Esta semana"** (plazo real con `tileDeadline` en `lib/hero.ts`; scroll al menú) y **"Viaje Sano"**.
-  La de Viaje Sano depende de `ViajeSettings.estado` (ver sección Viaje Sano): *abierto* → enlace a `/viaje-sano`; *pronto* →
-  tarjeta atenuada "Disponible pronto" que abre WhatsApp ("Avisame cuando abra", cuenta `viaje_alert`); *oculto* → no hay tarjeta.
-  `destacar` ("semana" | "viaje") decide cuál de las dos va rellena en crema (temporada de viajes). Con pedidos cerrados la
-  tarjeta de la semana pasa a "Cerrado · Avisarme ↓". La **vitrina de platos** (`components/HeroStrip.tsx`) ya **no se usa en la
-  portada** (el archivo y `public/platos/vitrina-sano.webp` quedan por si se quiere volver). En **modo evento** el hero es el de
-  siempre: texto a la izquierda y **sello** (`lib/brand · Seal`) a la derecha.
+- **Hero** (centrado, compacto): título grande en mayúsculas (Oswald, acento crema en "Y CENAS.") y **dos tarjetas tocables**
+  (`.tiles` en `Ordering.tsx`): **"Esta semana"** (plazo real con `tileDeadline` en `lib/hero.ts`, días de retiro y precio reales del ciclo;
+  scroll al menú) y **"Viaje Sano"**. La de Viaje Sano depende de `ViajeSettings.estado` (ver sección Viaje Sano): *abierto* → enlace a
+  `/viaje-sano`; *pronto* → tarjeta atenuada "Disponible pronto" que abre WhatsApp ("Avisame cuando abra", cuenta `viaje_alert`);
+  *oculto* → no hay tarjeta. `destacar` ("semana" | "viaje") decide cuál de las dos va rellena en crema (temporada de viajes). Con pedidos
+  cerrados la tarjeta de la semana pasa a "Cerrado · Avisarme ↓". Debajo: chips de datos (**"Retiro en 22 Bistro · Ciudad Colón"** y, si hay
+  precio configurado, **"💪 Proteína Extra disponible · desde +₡X"**), una línea de marca (@sanoby22bistro · 4,8★ en Google · atención 1 a 1)
+  y la **vitrina de platos en bucle** (`components/HeroStrip.tsx`, a todo el ancho). En **modo evento** no va la vitrina: el hero es el de
+  siempre, texto a la izquierda y **sello** (`lib/brand · Seal`) a la derecha.
 - **Contador del hero** ("Cierra en…" + cupos): lo gobierna `Settings.heroPillMode` (`auto` | `siempre` |
   `nunca`) y `heroPillHours`, editables en **Contenido → Contador del hero**. Por defecto `auto`: solo aparece
   cuando faltan **2 h o menos** para el cierre (y se esconde al cerrar); la pill flotante sigue la misma regla.
@@ -42,8 +43,7 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   "Ya la tengo" / descargar lo apagan en ese dispositivo (`lib/loyalty.ts`, localStorage). No aparece en el
   evento. El pie de página conserva su bloque "Ganá cortesías" con el enlace.
 - **Proteína Extra visible**: si un plato del menú tiene el extra activo (precio en Contenido), su fila lleva la etiqueta
-  "💪 Proteína Extra disponible" y, al agregarlo, aparece el selector del extra. Sin precio configurado no aparece nada.
-  (El chip del hero se quitó con el rediseño de la portada.)
+  "💪 Proteína Extra disponible" (y hay un chip en el hero) y, al agregarlo, aparece el selector del extra. Sin precio configurado no aparece nada.
 - **Pedidos cerrados**: la tarjeta de pausa (y "Avisarme ↓" en el hero) ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
   mensaje escrito; cuenta como evento `menu_alert`). La tarjeta muestra chips tocables: **"Esta semana tuvimos"** (el menú
   que acaba de cerrar, que sigue siendo `settings.menu` hasta publicar otro) y **"Los favoritos"** (top 10 de platos más
