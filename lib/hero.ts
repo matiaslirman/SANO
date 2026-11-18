@@ -62,3 +62,17 @@ export function heroPriceLine(basePrice: number, combos: ComboTier[]): string {
   const base = `Platos desde ${crc(basePrice)}`;
   return first ? `${base} · Combo de ${first.min} por ${crc(first.price)}` : base;
 }
+
+/** "₡5.500 c/u · combo de 6 por ₡31.000" (la línea de precio del menú semanal; sin combos, solo el precio). */
+export function menuPriceLine(basePrice: number, combos: ComboTier[]): string {
+  const first = [...combos].sort((a, b) => a.min - b.min)[0];
+  const base = `${crc(basePrice)} c/u`;
+  return first ? `${base} · combo de ${first.min} por ${crc(first.price)}` : base;
+}
+
+/** Texto de la tarjeta «Esta semana»: "Platos listos · pedí hasta el sábado 7:30 p. m." (sin cierre válido, sin plazo). */
+export function tileDeadline(cutoffISO: string | undefined): string {
+  const day = cutoffISO ? cutoffDayLabel(cutoffISO) : "";
+  if (!day) return "Platos listos para retirar";
+  return `Platos listos · pedí hasta el ${day} ${cutoffTimeLabel(cutoffISO as string)}`;
+}

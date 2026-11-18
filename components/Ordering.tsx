@@ -1,22 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { PublicStatus, MarketCategory, Order } from "@/lib/types";
-import { priceForDishes, comboLabel, nextCombo, savingsVsBase, PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
-import { crc } from "@/lib/format";
+import { priceForDishes, comboLabel, nextCombo, savingsVsBase, comboProgress, PROTEIN_EXTRA_LABEL } from "@/lib/pricing";
+import { crc, shortDeliveryLabel } from "@/lib/format";
 import { ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "@/lib/windows";
 import { Seal } from "@/lib/brand";
 import { loyaltyDone } from "@/lib/loyalty";
-import { shouldShowHeroPill, closingLine, heroPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
-import { HeroStrip } from "./HeroStrip";
+import { shouldShowHeroPill, tileDeadline, menuPriceLine, HERO_PILL_DEFAULT_HOURS } from "@/lib/hero";
 import { LoyaltyPopup } from "./LoyaltyPopup";
 import { track } from "@/lib/track";
 import { isValidEmail, loadContact, saveContact } from "@/lib/contact";
 import { menuAlertMessage } from "@/lib/favorites";
+import { viajeAlertMessage } from "@/lib/viaje";
+import { MarketStrip, mkey } from "./MarketStrip";
+import { AddStepper } from "./AddStepper";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
-
-const mkey = (catId: string, item: string) => `${catId}|${item}`;
 
 /** Config de evento privado: mismo flujo, con su propio encabezado y fecha fija. */
 export interface EventMode {
@@ -49,7 +50,6 @@ export function Ordering({
   const [email, setEmail] = useState("");
   const emailBad = email.trim() !== "" && !isValidEmail(email);
   const [notes, setNotes] = useState("");
-  const [catalogOpen, setCatalogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<Order | null>(null);
   // Pop-up de la tarjeta de cliente frecuente: se arma al crear el pedido y aparece al volver de WhatsApp.
@@ -59,7 +59,10 @@ export function Ordering({
   const [picks, setPicks] = useState<string[]>([]); // platos que la persona quiere que vuelvan (pedidos cerrados)
 
   // ── entrega elegida por el cliente (próximo viernes / próximo lunes) ──
-  const [selWinId, setSelWinId] = useState<string>(() => initialStatus.windows[0]?.id || "");
+  // entrega elegida: por defecto la primera que todavía tiene cupos
+  const [selWinId, setSelWinId] = useState<string>(
+    () => initialStatus.windows.find((w) => w.cuposDisponibles > 0)?.id || initialStatus.windows[0]?.id || ""
+  );
   const selWin =
     status.windows.find((w) => w.id === selWinId) ||
     status.windows[0] || {
@@ -103,10 +106,6 @@ export function Ordering({
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
   // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
   const paused = !isEvent && status.windows.length === 0;
-  // Proteína Extra: ¿algún plato del menú la ofrece? (precio real configurado en Contenido)
-  const extraList = isEvent ? [] : status.menu.map((d) => status.extraPrices?.[d] || 0).filter((p) => p > 0);
-  const extraAvail = !paused && extraList.length > 0;
-  const extraMin = extraList.length ? Math.min(...extraList) : 0;
   const menuAlertHref = `https://wa.me/${WA}?text=${encodeURIComponent(menuAlertMessage(picks))}`;
   const togglePick = (d: string) => setPicks((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const heroPillRef = useRef<HTMLDivElement>(null);
@@ -115,7 +114,7 @@ export function Ordering({
   const pillMode = status.heroPill?.mode ?? "auto";
   const pillHours = status.heroPill?.hours ?? HERO_PILL_DEFAULT_HOURS;
   const showCountdown = !isEvent && shouldShowHeroPill(pillMode, pillHours, cd.totalMin, cd.closed);
-  const pillOnScreen = paused || showCountdown; // el contenedor del hero existe solo si hay algo que mostrar
+  const pillOnScreen = !paused && showCountdown; // el contenedor del contador existe solo si hay algo que mostrar
   useEffect(() => {
     setPillShow(false);
     const el = heroPillRef.current;
@@ -221,19 +220,10 @@ export function Ordering({
   const savings = savingsVsBase(totals.dishesQty, status.basePrice, status.combos);
   const combo = comboLabel(totals.dishesQty, status.combos);
   const next = nextCombo(totals.dishesQty, status.combos);
+  const prog = comboProgress(totals.dishesQty, status.basePrice, status.combos);
+  const marketN = totals.marketCount;
   const soldOut = !paused && selWin.cuposDisponibles <= 0;
   const canSubmit = totals.grand > 0 && name.trim().length > 0 && !emailBad && !soldOut && !paused && !submitting;
-
-  // ── suggested para el upsell (4 destacados) ──
-  const suggested = useMemo(() => {
-    const out: { cat: MarketCategory; item: string }[] = [];
-    for (const c of market) if (c.suggested && c.items[0]) out.push({ cat: c, item: c.items[0] });
-    for (const c of market) {
-      if (out.length >= 4) break;
-      if (!c.suggested && c.items[0]) out.push({ cat: c, item: c.items[0] });
-    }
-    return out.slice(0, 4);
-  }, [market]);
 
   // ── acciones ──
   const stepDish = (dish: string, delta: number) => {
@@ -297,6 +287,29 @@ export function Ordering({
   );
 
   const scrollToMenu = () => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
+
+  // Tarjeta de Viaje Sano según el estado que fija el dueño: abierta, «Disponible pronto» o ninguna.
+  const viajeFirst = status.viaje?.estado === "abierto" && status.viaje.destacar === "viaje"; // temporada de viajes
+  const viajeTile =
+    isEvent || !status.viaje ? null : status.viaje.estado === "abierto" ? (
+      <Link className={`tile ${viajeFirst ? "fill" : "line"}`} href="/viaje-sano">
+        <span className="t">Viaje Sano{paused && <> <span className="tbadge open">Abierto</span></>}</span>
+        <span className="s">Bandejas para llevar · vos elegís la fecha</span>
+        <span className="go">Armar mi pedido →</span>
+      </Link>
+    ) : status.viaje.estado === "pronto" ? (
+      <a
+        className="tile soon"
+        href={`https://wa.me/${WA}?text=${encodeURIComponent(viajeAlertMessage())}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => track("viaje_alert")}
+      >
+        <span className="t">Viaje Sano <span className="tbadge soon">Disponible pronto</span></span>
+        <span className="s">Bandejas para llevar · {status.viaje.fecha}</span>
+        <span className="go">Avisame cuando abra →</span>
+      </a>
+    ) : null;
   const scrollToCheckout = () =>
     document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -419,7 +432,7 @@ export function Ordering({
     <>
       {/* ============ HERO ============ */}
       <section className={`hero ${phaseClass}`}>
-        <div className={`wrap${isEvent ? "" : " hero-wrap-solo"}`}>
+        <div className={`wrap${isEvent ? "" : " hero-wrap-solo hero-center"}`}>
           <div className="hero-copy">
             {isEvent ? (
               <>
@@ -441,76 +454,28 @@ export function Ordering({
                 <h1 className="hero-title">
                   Resolvé almuerzos <em>y cenas.</em>
                 </h1>
-                <p className="lead">
-                  Platos de chef, listos para retirar. Elegí los tuyos y coordinás todo por WhatsApp en un
-                  minuto.
-                </p>
-                {!paused ? (
-                  <div className="hero-cta">
-                    <button className="btn-primary" onClick={scrollToMenu}>
-                      Pedir ahora →
-                    </button>
-                  </div>
-                ) : (
-                  <div className="hero-cta">
-                    <a
-                      className="btn-primary"
-                      href={menuAlertHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => track("menu_alert")}
-                    >
-                      💬 Avisame cuando salga el menú
+                <div className={`tiles${viajeTile ? "" : " one"}`}>
+                  {!paused ? (
+                    <a className={`tile ${viajeFirst ? "line" : "fill"}`} href="#menu" onClick={(e) => { e.preventDefault(); scrollToMenu(); }}>
+                      <span className="t">Esta semana</span>
+                      <span className="s">{!cd.closed && selWin.id ? tileDeadline(selWin.cutoffISO) : "Platos listos para retirar"}</span>
+                      <span className="go">Pedir ahora →</span>
                     </a>
-                  </div>
-                )}
-                <div className="trust">
-                  <span className="ig">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
-                      <circle cx="12" cy="12" r="4.2" />
-                      <circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none" />
-                    </svg>
-                    @sanoby22bistro
-                  </span>
-                  <span className="sep" />
-                  <span>22 Bistro · 4,8★ en Google</span>
-                  <span className="sep trust-extra" />
-                  <span className="trust-extra">Atención personalizada 1 a 1</span>
+                  ) : (
+                    <a className="tile line shut" href="#menu" onClick={(e) => { e.preventDefault(); scrollToMenu(); }}>
+                      <span className="t">Esta semana <span className="tbadge shut">Cerrado</span></span>
+                      <span className="s">Abrimos con el próximo menú</span>
+                      <span className="go">Avisarme ↓</span>
+                    </a>
+                  )}
+                  {viajeTile}
                 </div>
 
-                {/* Precio real + plazo de pedidos (el plazo se reemplaza por el contador cuando este aparece) */}
-                {!paused && (
-                  <div className="hero-meta">
-                    <span className="hero-price">{heroPriceLine(status.basePrice, status.combos)}</span>
-                    {extraAvail && (
-                      <button type="button" className="hero-extra" onClick={scrollToMenu}>
-                        <span aria-hidden="true">💪</span> {PROTEIN_EXTRA_LABEL} disponible
-                        <span className="hero-extra-p tnum"> · desde +{crc(extraMin)}</span>
-                      </button>
-                    )}
-                    {!showCountdown && selWin.id && !cd.closed && (
-                      <span className="hero-close">{closingLine(selWin.cutoffISO, selWin.deliveryDateLabel)}</span>
-                    )}
-                  </div>
-                )}
-
-                {/* PILL de urgencia — según el modo del panel; anclado en el hero, se despega y sigue al scrollear */}
+                {/* contador: solo cuando faltan pocas horas para el cierre (regla de Contenido → Contador del hero) */}
                 {pillOnScreen && (
                   <div className="hero-urgency" ref={heroPillRef}>
-                    {paused ? (
-                      <span className="pill pill-paused">
-                        <span className="pill-blk">
-                          <span className="pill-lab">Pedidos</span>
-                          <span className="pill-val">Cerrados por ahora</span>
-                        </span>
-                      </span>
-                    ) : (
-                      <>
-                        {renderPill(true)}
-                        <span className="sr-only" role="timer">{cdA11y}</span>
-                      </>
-                    )}
+                    {renderPill(true)}
+                    <span className="sr-only" role="timer">{cdA11y}</span>
                   </div>
                 )}
               </>
@@ -526,43 +491,11 @@ export function Ordering({
         </div>
 
         {/* VITRINA — tira de platos reales que corre en bucle a todo el ancho (solo en el hero público) */}
-        {!isEvent && <HeroStrip />}
       </section>
 
       {/* ============ SHEET ============ */}
       <div className="sheet">
         <div className="wrap">
-          {/* ELEGIR DÍA DE RETIRO */}
-          {!isEvent && status.windows.length > 0 && (
-            <div className="daypick">
-              <div className="daypick-head">
-                <span className="daypick-kick">Elegí tu día de retiro</span>
-                <span className="daypick-sub">Mismo menú · retiro en el local 8 a.m. – 12 md</span>
-              </div>
-              <div className="daypick-opts">
-                {status.windows.map((w) => {
-                  const sel = w.id === selWin.id;
-                  const out = w.cuposDisponibles <= 0;
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      className={`daypick-opt${sel ? " on" : ""}${out ? " out" : ""}`}
-                      aria-pressed={sel}
-                      onClick={() => setSelWinId(w.id)}
-                    >
-                      <span className="dp-day">{w.deliveryDateLabel}</span>
-                      <span className="dp-meta">
-                        {out ? "Sin cupos" : `${w.cuposDisponibles} ${w.cuposDisponibles === 1 ? "cupo disponible" : "cupos disponibles"}`}
-                      </span>
-                      {sel && <span className="dp-check" aria-hidden="true">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {paused && (
             <div className="pause-card" id="menu" role="status">
               <div className="pause-kick">Sano</div>
@@ -612,58 +545,39 @@ export function Ordering({
           {!paused && (
           <>
           {/* MENU */}
-          <div className="sec-head" id="menu">
-            <div>
-              <div className="sec-kick">{isEvent ? "Menú del evento · Sano" : "Platos listos · Sano Premium"}</div>
-              <h2 className="sec-title">{isEvent ? "Elegí tus platos" : "Menú de la semana"}</h2>
+          {isEvent ? (
+            <div className="sec-head" id="menu">
+              <div>
+                <div className="sec-kick">Menú del evento · Sano</div>
+                <h2 className="sec-title">Elegí tus platos</h2>
+              </div>
+              <span className="week-pill">{status.weekLabel}</span>
             </div>
-            <span className="week-pill">{status.weekLabel}</span>
-          </div>
-
-          <div className="combos">
-            <span className="combos-lead">
-              Elegí libre · <b>a más platos, mejor precio</b>
-            </span>
-            <div className="combos-cells">
-              {status.combos.map((c, i) => (
-                <div key={c.min} className={`combo-cell${i === status.combos.length - 1 ? " featured" : ""}`}>
-                  {i === status.combos.length - 1 && <span className="cc-tag">Mejor precio</span>}
-                  <span className="cc-q">{c.min}</span>
-                  <span className="cc-l">platos</span>
-                  <span className="cc-p tnum">{crc(c.price)}</span>
-                  {/* precio por plato del combo: deja ver de una el ahorro real */}
-                  <span className="cc-u tnum">{crc(Math.round(c.price / c.min))} c/u</span>
-                </div>
-              ))}
+          ) : (
+            <div className="sec-head" id="menu">
+              <h2 className="sec-title">Menú de la semana</h2>
+              <p className="sec-sub">{menuPriceLine(status.basePrice, status.combos)}</p>
             </div>
-          </div>
+          )}
 
-          <div className="menu-grid">
+          <div className="wk-rows">
             {status.menu.map((dish, i) => {
               const q = dishQty[dish] || 0;
+              const popular = !isEvent && !!status.popular?.includes(dish);
+              const showExtraTag = q === 0 && extraPrice(dish) > 0;
               return (
-                <div key={dish} className={`dish${q > 0 ? " active" : ""}`}>
-                  <div className="top">
-                    <span className="idx">{i + 1}</span>
-                    <h3>{dish}</h3>
+                <div key={dish} className={`wk-row${q > 0 ? " on" : ""}`}>
+                  <span className="widx">{i + 1}</span>
+                  <div className="wbody">
+                    <div className="wname">{dish}</div>
+                    {(popular || showExtraTag) && (
+                      <div className="wtags">
+                        {popular && <span className="wtag">Más pedido</span>}
+                        {showExtraTag && <span className="dish-xtag">💪 {PROTEIN_EXTRA_LABEL} disponible</span>}
+                      </div>
+                    )}
                   </div>
-                  {q === 0 && extraPrice(dish) > 0 && (
-                    <span className="dish-xtag">💪 {PROTEIN_EXTRA_LABEL} disponible</span>
-                  )}
-                  <div className="row2">
-                    <span className="price-each">
-                      Desde <b>{crc(status.basePrice)}</b> c/u
-                    </span>
-                    <div className="stepper">
-                      <button onClick={() => stepDish(dish, -1)} disabled={q <= 0} aria-label="Quitar">
-                        –
-                      </button>
-                      {q > 0 ? <span className="q tnum">{q}</span> : <span className="add">Agregar</span>}
-                      <button onClick={() => stepDish(dish, 1)} aria-label="Sumar">
-                        +
-                      </button>
-                    </div>
-                  </div>
+                  <AddStepper qty={q} label={dish} onMinus={() => stepDish(dish, -1)} onPlus={() => stepDish(dish, 1)} />
                   {q > 0 && extraPrice(dish) > 0 && (
                     <div className={`pextra${extraOf(dish) > 0 ? " on" : ""}`}>
                       {extraOf(dish) === 0 ? (
@@ -681,14 +595,7 @@ export function Ordering({
                           <div className="pextra-step" aria-label={`${PROTEIN_EXTRA_LABEL} en ${dish}`}>
                             <button type="button" onClick={() => stepExtra(dish, -1)} aria-label={`Quitar ${PROTEIN_EXTRA_LABEL}`}>–</button>
                             <span className="q tnum">{extraOf(dish)}</span>
-                            <button
-                              type="button"
-                              onClick={() => stepExtra(dish, 1)}
-                              disabled={extraOf(dish) >= q}
-                              aria-label={`Sumar ${PROTEIN_EXTRA_LABEL}`}
-                            >
-                              +
-                            </button>
+                            <button type="button" onClick={() => stepExtra(dish, 1)} disabled={extraOf(dish) >= q} aria-label={`Sumar ${PROTEIN_EXTRA_LABEL}`}>+</button>
                           </div>
                         </>
                       )}
@@ -700,68 +607,7 @@ export function Ordering({
           </div>
 
           {/* MARKET */}
-          {!isEvent && (
-          <div className="market" id="market">
-            <div className="mhead">
-              <div>
-                <div className="mkick">Para acompañar</div>
-                <h3>¿Sumás algo de Sano Market?</h3>
-              </div>
-            </div>
-            <div className="mgrid">
-              {suggested.map(({ cat, item }) => {
-                const q = marketQty[mkey(cat.id, item)] || 0;
-                return (
-                  <div key={mkey(cat.id, item)} className="mcard">
-                    <span className="cat">{cat.name.replace(" SANO", "")}</span>
-                    <span className="nm">{item}</span>
-                    <div className="prow">
-                      <span className="pr tnum">{crc(cat.price)}</span>
-                      <div className="mini">
-                        <button onClick={() => stepMarket(cat.id, item, -1)} disabled={q <= 0}>
-                          –
-                        </button>
-                        <span className="q tnum">{q}</span>
-                        <button onClick={() => stepMarket(cat.id, item, 1)}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button className="seemore" onClick={() => setCatalogOpen((v) => !v)}>
-              {catalogOpen ? "Ocultar catálogo" : "Ver todo el catálogo de Sano Market"}
-            </button>
-
-            {catalogOpen && (
-              <div className="catalog">
-                {market.map((cat) => (
-                  <div key={cat.id} className="catblock">
-                    <h4>
-                      {cat.name} <span>{crc(cat.price)} · {cat.unit}</span>
-                    </h4>
-                    {cat.items.map((item) => {
-                      const q = marketQty[mkey(cat.id, item)] || 0;
-                      return (
-                        <div key={item} className="catrow">
-                          <span className="cn">{item}</span>
-                          <div className="mini">
-                            <button onClick={() => stepMarket(cat.id, item, -1)} disabled={q <= 0}>
-                              –
-                            </button>
-                            <span className="q tnum">{q}</span>
-                            <button onClick={() => stepMarket(cat.id, item, 1)}>+</button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
+          {!isEvent && <MarketStrip market={market} qty={marketQty} onStep={stepMarket} />}
 
           {/* CHECKOUT */}
           <div className="checkout" id="checkout">
@@ -770,7 +616,25 @@ export function Ordering({
             ) : (
               <>
                 <div className="panel">
-                  <h3>Tus datos</h3>
+                  <h3>{isEvent ? "Tus datos" : "Tu retiro"}</h3>
+                  {!isEvent && status.windows.length > 0 && (
+                    <div className="field">
+                      <span className="flabel" id="wk-day-l">¿Qué día retirás?</span>
+                      <div className="wk-days" role="group" aria-labelledby="wk-day-l">
+                        {status.windows.map((w) => {
+                          const on = w.id === selWin.id;
+                          const out = w.cuposDisponibles <= 0;
+                          return (
+                            <button key={w.id} type="button" className={`wk-day${on ? " on" : ""}${out ? " out" : ""}`} aria-pressed={on} onClick={() => setSelWinId(w.id)}>
+                              <span className="d">{shortDeliveryLabel(w.deliveryDateLabel)}</span>
+                              <span className="m">{out ? "Sin cupos" : `${w.cuposDisponibles} ${w.cuposDisponibles === 1 ? "cupo" : "cupos"}`}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="hint">Retiro en el local · 8 a.m. – 12 md. Es el mismo menú los dos días.</div>
+                    </div>
+                  )}
                   <div className="field">
                     <label htmlFor="nm">Nombre y apellido</label>
                     <input id="nm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: María Fernández" />
@@ -846,7 +710,6 @@ export function Ordering({
                         if (!q) return null;
                         return (
                           <div key={dish} className="cline">
-                            <span className="qy">{q}×</span>
                             <span className="nm">
                               {dish}
                               {extraOf(dish) > 0 && (
@@ -855,6 +718,7 @@ export function Ordering({
                                 </small>
                               )}
                             </span>
+                            <AddStepper qty={q} label={dish} onMinus={() => stepDish(dish, -1)} onPlus={() => stepDish(dish, 1)} />
                           </div>
                         );
                       })}
@@ -865,9 +729,9 @@ export function Ordering({
                           if (!q) return null;
                           return (
                             <div key={mkey(cat.id, item)} className="cline">
-                              <span className="qy">{q}×</span>
-                              <span className="nm">{item}</span>
+                                <span className="nm">{item}</span>
                               <span className="amt">{crc(q * cat.price)}</span>
+                              <AddStepper qty={q} label={item} onMinus={() => stepMarket(cat.id, item, -1)} onPlus={() => stepMarket(cat.id, item, 1)} />
                             </div>
                           );
                         })
@@ -955,37 +819,57 @@ export function Ordering({
         </button>
       )}
 
-      {/* sticky total */}
-      <div className={`sticky${totals.grand > 0 && !created ? " show" : ""}`}>
+      {/* barra fija: total y lo que falta para el próximo combo */}
+      <div className={`sticky sticky-col${totals.grand > 0 && !created ? " show" : ""}`}>
+        <div className="swbar" aria-hidden="true">
+          <i style={{ width: `${prog.pct}%` }} />
+          {prog.ticks.map((t) => (
+            <em key={t} style={{ left: `${t}%` }} />
+          ))}
+        </div>
         <div className="wrap">
-          <div className="sinfo">
-            <span className="scount">
-              {totals.dishesQty} platos · {soldOut ? "sin cupos" : canSubmit ? "listo para enviar" : "toca continuar"}
-            </span>
-            <span className="stotal tnum">
-              {crc(totals.grand)}
-              {combo && <span className="stag">{combo}</span>}
-            </span>
+          <div className="swmsg">
+            {totals.dishesQty === 0 ? (
+              "Sumá platos del menú para armar tu pedido"
+            ) : prog.next ? (
+              <>
+                Sumá <b>{prog.next.min - totals.dishesQty}</b> más: combo de {prog.next.min} por <b>{crc(prog.next.price)}</b>
+              </>
+            ) : (
+              "✓ Mejor precio aplicado"
+            )}
           </div>
-          {soldOut ? (
-            <button className="go" disabled style={{ opacity: 0.65 }}>
-              Sin cupos
-            </button>
-          ) : canSubmit ? (
-            <button className="go wa" onClick={submit} disabled={submitting}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2m0 18.15c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24s8.24 3.7 8.24 8.24-3.7 8.24-8.24 8.24m4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12s-.64.81-.79.97c-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72s-.02-.38.11-.5c.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43s-.56-1.34-.76-1.84c-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31s-.86.85-.86 2.07.89 2.4 1.01 2.56c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.22-.17-.47-.29" />
-              </svg>
-              {submitting ? "Enviando…" : "Confirmar por WhatsApp"}
-            </button>
-          ) : (
-            <button className="go" onClick={scrollToCheckout}>
-              Continuar →
-            </button>
-          )}
+          <div className="swmain">
+            <div className="sinfo">
+              <span className="swrow">
+                <span className="stotal tnum">{crc(totals.grand)}</span>
+                <span className="scount">
+                  {totals.dishesQty} {totals.dishesQty === 1 ? "plato" : "platos"}
+                  {marketN > 0 ? ` + ${marketN} Market` : ""}
+                  {soldOut ? " · sin cupos" : ""}
+                </span>
+              </span>
+            </div>
+            {soldOut ? (
+              <button className="go" disabled style={{ opacity: 0.65 }}>
+                Sin cupos
+              </button>
+            ) : canSubmit ? (
+              <button className="go wa" onClick={submit} disabled={submitting}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2m0 18.15c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24s8.24 3.7 8.24 8.24-3.7 8.24-8.24 8.24m4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12s-.64.81-.79.97c-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72s-.02-.38.11-.5c.11-.11.25-.29.37-.43.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43s-.56-1.34-.76-1.84c-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31s-.86.85-.86 2.07.89 2.4 1.01 2.56c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.22-.17-.47-.29" />
+                </svg>
+                {submitting ? "Enviando…" : "Confirmar por WhatsApp"}
+              </button>
+            ) : (
+              <button className="go" onClick={scrollToCheckout}>
+                Continuar →
+              </button>
+            )}
+          </div>
         </div>
       </div>
-      <div style={{ height: totals.grand > 0 && !created ? 84 : 0 }} />
+      <div style={{ height: totals.grand > 0 && !created ? 116 : 0 }} />
 
       {toast && <div className="toast show">{toast}</div>}
       <LoyaltyPopup open={loyaltyOpen} onClose={() => setLoyaltyOpen(false)} />

@@ -74,3 +74,28 @@ export function savingsVsBase(
 ): number {
   return qty * basePrice - priceForDishes(qty, basePrice, combos);
 }
+
+export interface ComboProgress {
+  /** Avance de la barra (0–100): platos / mínimo del combo más alto. */
+  pct: number;
+  /** Posición (0–100) de la marca de cada combo salvo el último, que está al final de la barra. */
+  ticks: number[];
+  /** Próximo combo por alcanzar, o null si ya está en el más alto (o no hay combos). */
+  next: ComboTier | null;
+  /** Lo que se ahorra en total con el próximo combo frente a pagar todo a precio base. */
+  nextSavings: number;
+}
+
+/** Datos de la barra de progreso de combos (barra fija del menú semanal). */
+export function comboProgress(qty: number, basePrice: number, combos: ComboTier[]): ComboProgress {
+  const sorted = [...combos].sort((a, b) => a.min - b.min);
+  const last = sorted[sorted.length - 1];
+  if (!last || last.min <= 0) return { pct: 0, ticks: [], next: null, nextSavings: 0 };
+  const next = nextCombo(qty, combos);
+  return {
+    pct: Math.max(0, Math.min(100, (qty / last.min) * 100)),
+    ticks: sorted.slice(0, -1).map((c) => (c.min / last.min) * 100),
+    next,
+    nextSavings: next ? next.min * basePrice - next.price : 0,
+  };
+}

@@ -22,29 +22,29 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
 
 ## Arquitectura
 - `app/page.tsx` — landing pública. Renderiza `components/Ordering.tsx`.
-- `components/Ordering.tsx` — **todo el flujo de pedido del cliente** (hero, selector de día,
-  menú, Sano Market, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
-  mismo componente sin selector de día, sin Market y sin countdown.
-- **Hero**: título grande en mayúsculas (Oswald, acento crema en "Y CENAS."), una línea de **precio real**
-  (`heroPriceLine`) y el plazo (`closingLine`: "Pedidos abiertos hasta el sábado 7:30 p. m. · Retiro lunes 19…"; la hora sale del cierre real de la ventana).
-  Debajo del texto, a **todo el ancho**, una **vitrina de platos reales** (`components/HeroStrip.tsx`): la
-  composición `public/platos/vitrina-sano.webp` (táperes sobre fondo transparente, con sombra suave) que corre
-  en **bucle continuo** (animación CSS: la imagen se duplica y se desplaza exactamente una copia con
-  `translateX -50%`, así el loop no tiene salto); extremos con degradé de desvanecido; se pausa con el mouse o
-  al mantener el dedo; con "reducir movimiento" queda una tira que se desliza a mano. Para cambiar la vitrina,
-  pisá el `.webp` (export transparente @2x desde Figma). En **modo evento** no va la vitrina sino el **sello**
-  (`lib/brand · Seal`) a la derecha del texto.
+- `components/Ordering.tsx` — **todo el flujo de pedido del cliente** (hero, menú, Sano Market,
+  "Tu retiro" con el día, checkout → WhatsApp). Tiene un **"modo evento"** (prop `event`) que reusa el
+  mismo componente sin día de retiro, sin Market, sin tarjetas de Viaje Sano y sin countdown.
+- **Hero** (centrado): título grande en mayúsculas (Oswald, acento crema en "Y CENAS.") y **dos tarjetas tocables**
+  (`.tiles` en `Ordering.tsx`): **"Esta semana"** (plazo real con `tileDeadline` en `lib/hero.ts`; scroll al menú) y **"Viaje Sano"**.
+  La de Viaje Sano depende de `ViajeSettings.estado` (ver sección Viaje Sano): *abierto* → enlace a `/viaje-sano`; *pronto* →
+  tarjeta atenuada "Disponible pronto" que abre WhatsApp ("Avisame cuando abra", cuenta `viaje_alert`); *oculto* → no hay tarjeta.
+  `destacar` ("semana" | "viaje") decide cuál de las dos va rellena en crema (temporada de viajes). Con pedidos cerrados la
+  tarjeta de la semana pasa a "Cerrado · Avisarme ↓". La **vitrina de platos** (`components/HeroStrip.tsx`) ya **no se usa en la
+  portada** (el archivo y `public/platos/vitrina-sano.webp` quedan por si se quiere volver). En **modo evento** el hero es el de
+  siempre: texto a la izquierda y **sello** (`lib/brand · Seal`) a la derecha.
 - **Contador del hero** ("Cierra en…" + cupos): lo gobierna `Settings.heroPillMode` (`auto` | `siempre` |
   `nunca`) y `heroPillHours`, editables en **Contenido → Contador del hero**. Por defecto `auto`: solo aparece
   cuando faltan **2 h o menos** para el cierre (y se esconde al cerrar); la pill flotante sigue la misma regla.
-  Mientras está escondido, se ve la línea del plazo. Lógica y tests en `lib/hero.ts` / `scripts/test-hero.mts`.
+  Mientras está escondido, el plazo se ve en la tarjeta "Esta semana". Lógica y tests en `lib/hero.ts` / `scripts/test-hero.mts`.
 - **Tarjeta de cliente frecuente**: ya no está en el hero; es un **pop-up** (`components/LoyaltyPopup.tsx`) que
   aparece al **volver de WhatsApp** tras crear un pedido (o a los ~3 s si la persona se queda en la página).
   "Ya la tengo" / descargar lo apagan en ese dispositivo (`lib/loyalty.ts`, localStorage). No aparece en el
   evento. El pie de página conserva su bloque "Ganá cortesías" con el enlace.
-- **Proteína Extra visible**: si algún plato del menú tiene el extra activo (precio en Contenido), el hero muestra el chip
-  "💪 Proteína Extra disponible · desde +₡X" y cada plato lleva su etiqueta. Sin precio configurado no aparece nada.
-- **Pedidos cerrados**: el hero y la tarjeta de pausa ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
+- **Proteína Extra visible**: si un plato del menú tiene el extra activo (precio en Contenido), su fila lleva la etiqueta
+  "💪 Proteína Extra disponible" y, al agregarlo, aparece el selector del extra. Sin precio configurado no aparece nada.
+  (El chip del hero se quitó con el rediseño de la portada.)
+- **Pedidos cerrados**: la tarjeta de pausa (y "Avisarme ↓" en el hero) ofrecen "Avisame cuando salga el menú" (abre WhatsApp al negocio,
   mensaje escrito; cuenta como evento `menu_alert`). La tarjeta muestra chips tocables: **"Esta semana tuvimos"** (el menú
   que acaba de cerrar, que sigue siendo `settings.menu` hasta publicar otro) y **"Los favoritos"** (top 10 de platos más
   pedidos de siempre, **solo el nombre**, sin cifras; `lib/favorites.ts` → `topDishes`, datos reales, sin eventos, unidos
@@ -52,8 +52,38 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   Llega en `PublicStatus.closed` solo cuando el sitio está pausado.
 - **Contadores de uso** (`lib/track.ts`, `POST /api/track`, `store.trackEvent/getTrack`, hash `sano:track`): pop-up de la
   tarjeta (visto / descargar / "Ya la tengo" / "Ahora no") y `menu_alert`. Sin datos personales; se ven en Analítica.
+- **Menú semanal (portada)**: encabezado "Menú de la semana" + una línea de precio real (`menuPriceLine`); **una fila por plato**
+  (número, nombre, etiqueta "Más pedido" si está en `status.popular` —`popularInMenu` en `lib/favorites.ts`, datos reales— y el botón
+  **"+ Agregar"** sin relleno, `components/AddStepper.tsx`, 44 px). Sin fotos de platos. **Sano Market** es una tira deslizable con
+  categorías y contadores (`components/MarketStrip.tsx`; "Sugeridos" usa la misma regla de siempre). El **día de retiro** se elige
+  en **"Tu retiro"** (pills con cupos reales, por defecto el primero con cupos; `shortDeliveryLabel`). La comanda se edita ahí mismo
+  (sumar/quitar). La **barra fija** muestra total + lo que falta para el próximo combo con una barra de progreso con marcas
+  (`comboProgress` en `lib/pricing.ts`). iPhone primero: campos a 16 px (sin zoom), áreas táctiles de 44 px.
+
+### Viaje Sano (`/viaje-sano`) — bandejas para llevar de viaje
+Producto aparte del menú semanal, con su propia página, pedidos y panel. **1 bandeja = 4 porciones** (1 almuerzo o cena para 4); los
+packs son solo platos fuertes (lasañas, pechugas rellenas, arroz chaufa); proteínas/acompañamientos/salsas son extras sueltos.
+- **Flujo**: calculadora (personas, almuerzos, cenas → bandejas) → **recomendación de pack** (`recommendPack`, tolerancia ±1 bandeja)
+  → packs o armado a gusto → "Tu retiro": **el cliente elige la fecha** (anticipación mínima `leadDays`, 7 por defecto, en hora CR) →
+  confirma por **WhatsApp** (sin pasarela, sin cupos). El dueño confirma fecha y hora por WhatsApp. Las bandejas van **refrigeradas**
+  (aviso de cadena de frío, `chainText`). Premios por monto (`rewards`, p. ej. "1 salsa de regalo").
+- **Estado** (`ViajeSettings.estado`, Contenido → Viaje Sano): `oculto` (404 para el público), `pronto` (por defecto: tarjeta atenuada
+  + página "Disponible pronto") o `abierto`. El dueño logueado ve y prueba la página real aunque no esté abierta. Con estado distinto de
+  `abierto`, `POST /api/viaje/orders` responde 409.
+- **Lógica pura** en `lib/viaje.ts` (calculadora, packs, fechas en hora CR, `checkViajeOrder`, mensajes de WhatsApp, `normalizeViaje`).
+  El **servidor es la autoridad de precios**: el cliente solo manda ids y cantidades.
+- **Pedidos**: mismo contador `SANO-<n>`, pero con `kind: "viaje"`, `pickupDate`, `pickupConfirmed`, `viaje` (líneas con precio del
+  momento), `viajePack`, `viajeGift`, `windowId: "viaje"`. **Aislamiento**: `store.listOrders()` **excluye** los pedidos de viaje, así que
+  cupos, Pedidos, Resumen cocina, Etiquetas, insights, ranking y clientes nunca los ven. `store.listViajeOrders()` / `listAllOrders()` son
+  opt-in explícito. Lo único que los mezcla es el **ingreso por mes** de Analítica (y su tarjeta propia "Viaje Sano").
+- **Panel**: pestaña **Viaje Sano** (`/admin/viaje`, `components/admin/ViajeOrdersView.tsx`): pedidos por fecha de retiro, **"Qué cocinar"**
+  (bandejas/porciones por plato y extras por unidad), mover fecha (queda "Por confirmar"), "Confirmar fecha" por WhatsApp, pagado/entregado.
+  El editor vive en **Contenido → Viaje Sano** (`components/admin/ViajeEditor.tsx`): estado, textos, anticipación, catálogo con precios y
+  "Activo", packs y premios. API: `/api/viaje/orders` (POST público si está abierto; GET admin), `/api/viaje/settings` (admin).
+- **Pendientes del dueño** (no inventar): vida útil refrigerada de las bandejas, alérgenos/ingredientes, horario de retiro de Viaje Sano
+  (hoy se asume 8 a. m.–12 md).
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
-- `app/admin/*` — panel: **Pedidos · Resumen cocina · Etiquetas · Analítica · Contenido**
+- `app/admin/*` — panel: **Pedidos · Viaje Sano · Resumen cocina · Etiquetas · Analítica · Contenido**
   (pestañas en `components/admin/AdminShell.tsx`).
 - `lib/store.ts` — **toda la persistencia**. Upstash Redis KV si hay credenciales (`kvEnv()`);
   si no, fallback a `.data/db.json` (efímero en Vercel).
@@ -90,9 +120,9 @@ El **correo** (`email`, opcional, minúsculas; `lib/contact.ts`) vincula al clie
   **nota/restricción**, esa nunca se corta: el QR baja 1,5 mm, se omite el wordmark y el plato se limita a 2 líneas.
   Verificado que el QR se lee en todos los formatos (también simulando 203 dpi).
 - **Analítica** — ingreso proyectado / confirmado / por cobrar, tasa de pago, ticket promedio,
-  producción por plato, platos y Market más vendidos, y el **ingreso por mes** (filtro por mes + histórico del negocio).
+  producción por plato, platos y Market más vendidos, y el **ingreso por mes** (filtro por mes + histórico del negocio; incluye los pedidos pagados de Viaje Sano, que además tienen su tarjeta propia).
 - **Contenido** — menú semanal (guardar = abrir la semana), cupos, precios y combos,
-  Proteína Extra, Sano Market, Evento privado e **Ingreso histórico**.
+  Proteína Extra, Sano Market, Evento privado, **Viaje Sano** (estado, catálogo, packs) e **Ingreso histórico**.
   - **Historial de platos** en el editor del menú: chips "Volver a incluir" con los platos de semanas
     anteriores (pedidos reales, sin eventos, agrupados con `groupDishes` y ordenados por más pedidos; se calcula
     en `app/admin/contenido/page.tsx` y se pasa como `dishHistory`). Tocar un chip agrega el plato al menú en
@@ -131,7 +161,7 @@ todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scr
   (tildes, mayúsculas, ~2 letras en nombres largos; "Ana" ≠ "Ana María"). Eventos no cuentan. Alimenta el insight de
   clientes que repiten.
 - Tests: `node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-<x>.mts`
-  (`windows`, `months`, `dishes`, `insights`, `hero`, `customers`).
+  (`windows`, `months`, `dishes`, `insights`, `hero`, `customers`, `favorites`, `viaje`, `weekly`).
 
 ## Desarrollo
 ```bash

@@ -18,6 +18,7 @@ export function ContentEditor({
   defaultDateA,
   defaultDateB,
   dishHistory,
+  children,
 }: {
   initialSettings: Settings;
   initialMarket: MarketCategory[];
@@ -25,6 +26,8 @@ export function ContentEditor({
   defaultDateA: string;
   defaultDateB: string;
   dishHistory: string[];
+  /** Secciones extra (p. ej. Viaje Sano) que se muestran después del Evento privado. */
+  children?: React.ReactNode;
 }) {
   // ── Menú ──
   const [menu, setMenu] = useState<string[]>(initialSettings.menu);
@@ -594,6 +597,8 @@ export function ContentEditor({
           <Saved show={savedEvent} />
         </div>
       </div>
+
+      {children}
 
       {/* CUPOS */}
       <div className="editcard">

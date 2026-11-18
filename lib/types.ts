@@ -100,6 +100,13 @@ export interface Order {
   status: OrderStatus;
   completed?: boolean; // "tachado" — entregado/completado por el dueño
   eventId?: string;    // si viene de un evento privado: clave del evento (agrupa su pestaña)
+  /** Pedido de Viaje Sano: vive aparte del ciclo semanal (sin ventana, sin cupos, sin platos del menú). */
+  kind?: "viaje";
+  pickupDate?: string;       // viaje: fecha de retiro elegida por el cliente (YYYY-MM-DD, hora CR)
+  pickupConfirmed?: boolean; // viaje: el dueño ya confirmó fecha y hora por WhatsApp
+  viaje?: OrderViajeLine[];  // viaje: bandejas y extras con el precio de ese momento
+  viajePack?: string;        // viaje: pack con el que empezó el pedido (si lo hubo)
+  viajeGift?: string;        // viaje: regalo por volumen que ganó (texto)
 }
 
 export interface WindowInfo {
@@ -123,4 +130,60 @@ export interface PublicStatus {
   heroPill?: { mode: HeroPillMode; hours: number };
   /** Solo con los pedidos cerrados: el menú que acaba de cerrar y los favoritos de siempre (nombres, datos reales). */
   closed?: { thisWeek: DishName[]; favorites: DishName[] };
+  /** Viaje Sano: lo que decide si el hero muestra la tarjeta (abierta, «Disponible pronto» o nada). Ausente en el evento. */
+  viaje?: { estado: ViajeEstado; fecha: string; destacar: "semana" | "viaje" };
+  /** Platos de este menú que están entre los más pedidos de siempre (datos reales). Ausente si hay pocos pedidos. */
+  popular?: DishName[];
+}
+
+
+// ── Viaje Sano ────────────────────────────────────────────────
+/** Lo controla el dueño desde Contenido: oculto (no existe), pronto («Disponible pronto») o abierto (se puede pedir). */
+export type ViajeEstado = "oculto" | "pronto" | "abierto";
+
+/** Categorías fijas del catálogo de viaje (sus reglas viven en `lib/viaje.ts`). */
+export type ViajeCatId = "las" | "pec" | "cha" | "aco" | "pro" | "sal";
+
+export interface ViajeItem {
+  id: string;        // estable: lo referencian los packs y los pedidos
+  cat: ViajeCatId;
+  name: string;
+  desc?: string;     // una línea (ej. "Jamón y queso")
+  price: number;     // CRC por bandeja (o por unidad en proteínas y salsas)
+  active: boolean;   // oculto del sitio si está apagado
+}
+
+/** Un pack = solo platos fuertes (bandejas de 4 porciones). Los extras se suman aparte. */
+export interface ViajePack {
+  id: string;
+  name: string;
+  items: Record<string, number>; // id de producto -> cantidad
+}
+
+/** Regalo por volumen: desde `at` colones se regala `text` (ej. "1 salsa de regalo"). 0 = apagado. */
+export interface ViajeReward {
+  at: number;
+  text: string;
+}
+
+export interface ViajeSettings {
+  estado: ViajeEstado;
+  fecha: string;      // texto libre: "en las próximas semanas", "el 1 de diciembre"
+  /** Cuál tarjeta del hero va rellena: la del menú semanal (por defecto) o la de Viaje Sano (temporada de viajes). */
+  destacar: "semana" | "viaje";
+  leadDays: number;   // anticipación mínima de retiro, en días (hora CR)
+  chainText: string;  // aviso de cadena de frío junto a la fecha
+  rewards: ViajeReward[];
+  items: ViajeItem[];
+  packs: ViajePack[];
+}
+
+/** Línea de un pedido de viaje, con el precio del momento (el servidor es la autoridad). */
+export interface OrderViajeLine {
+  id: string;
+  cat: ViajeCatId;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
 }

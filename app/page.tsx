@@ -2,45 +2,17 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Ordering } from "@/components/Ordering";
 import { store } from "@/lib/store";
-import { getClientWindows } from "@/lib/windows";
-import { resolveExtraPrices } from "@/lib/pricing";
-import { resolveHeroPill } from "@/lib/hero";
-import type { PublicStatus, WindowInfo } from "@/lib/types";
+import { buildPublicStatus } from "@/lib/public-status";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const settings = await store.getSettings();
+  const status = await buildPublicStatus();
   const market = await store.getMarket();
-
-  const windows: WindowInfo[] = await Promise.all(
-    getClientWindows(settings.menuPublishedAt).map(async (w): Promise<WindowInfo> => {
-      const c = await store.computeCuposFor(w.id);
-      return {
-        id: w.id,
-        cutoffISO: w.cutoffISO,
-        deliveryLabel: w.deliveryLabel,
-        deliveryDateLabel: w.deliveryDateLabel,
-        cuposTotales: c.totales,
-        cuposDisponibles: c.disponibles,
-      };
-    })
-  );
-
-  const status: PublicStatus = {
-    menu: settings.menu,
-    weekLabel: settings.weekLabel,
-    basePrice: settings.basePrice,
-    combos: settings.combos,
-    windows,
-    extraPrices: resolveExtraPrices(settings),
-    heroPill: resolveHeroPill(settings),
-    ...(windows.length === 0 ? { closed: await store.getClosedShowcase(settings.menu) } : {}),
-  };
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader viaje={status.viaje?.estado === "abierto"} />
       <main>
         <Ordering initialStatus={status} initialMarket={market} />
       </main>

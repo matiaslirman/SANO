@@ -1,4 +1,4 @@
-import type { Settings, MarketCategory, EventSettings, MonthlyIncome } from "./types";
+import type { Settings, MarketCategory, EventSettings, MonthlyIncome, ViajeSettings } from "./types";
 
 /**
  * Ingreso histórico del negocio (hoja "SANO MONTHLY REPORT"), sep-2025 → oct-2026.
@@ -154,3 +154,53 @@ export const SUGGESTED_UPSELL: { catId: string; itemIndex: number }[] = [
   { catId: "dulcitos", itemIndex: 1 },  // Brownie Cacao Orgánico
   { catId: "salsas", itemIndex: 0 },    // Pesto Cremoso
 ];
+
+/**
+ * Viaje Sano por defecto: el menú de bandejas para llevar de viaje.
+ * Arranca en «pronto» (la tarjeta aparece apagada con «Disponible pronto»); el dueño lo abre desde Contenido.
+ * Precios y packs son editables en el panel. Los packs llevan solo platos fuertes.
+ */
+export const DEFAULT_VIAJE: ViajeSettings = {
+  estado: "pronto",
+  fecha: "en las próximas semanas",
+  destacar: "semana",
+  leadDays: 7,
+  chainText: "Las bandejas se entregan refrigeradas. Llevá una hielera para mantener la cadena de frío.",
+  rewards: [
+    { at: 60000, text: "1 salsa de regalo" },
+    { at: 120000, text: "2 salsas de regalo" },
+  ],
+  items: [
+    { id: "l1", cat: "las", name: "Lasaña de pollo", price: 18000, active: true },
+    { id: "l2", cat: "las", name: "Lasaña de carne boloñesa", price: 18000, active: true },
+    { id: "l3", cat: "las", name: "Lasaña de berenjena", price: 18000, active: true },
+    { id: "l4", cat: "las", name: "Lasaña de pollo, hongos y salsa trufada", price: 18000, active: true },
+    { id: "l5", cat: "las", name: "Lasaña de pollo con tocineta y hongos", price: 18000, active: true },
+    { id: "l6", cat: "las", name: "Lasaña de berenjena parmesana", price: 15000, active: true },
+    { id: "l7", cat: "las", name: "Lasaña de vegetales y salsa de tomate", price: 14000, active: true },
+    { id: "p1", cat: "pec", name: "Pechugas cordon bleu", desc: "Jamón y queso", price: 20000, active: true },
+    { id: "p2", cat: "pec", name: "Pechugas caprecce", desc: "Tomate, albahaca y queso", price: 20000, active: true },
+    { id: "c1", cat: "cha", name: "Arroz chaufa de pollo", price: 15000, active: true },
+    { id: "c2", cat: "cha", name: "Arroz chaufa de cerdo ahumado", price: 15000, active: true },
+    { id: "a1", cat: "aco", name: "Puré de papas extra", price: 5000, active: true },
+    { id: "a2", cat: "aco", name: "Vegetales salteados", price: 6000, active: true },
+    { id: "a3", cat: "aco", name: "Papas a la crema", price: 6000, active: true },
+    { id: "r1", cat: "pro", name: "Res mechada", price: 6500, active: true },
+    { id: "r2", cat: "pro", name: "Pollo mechado", price: 6000, active: true },
+    { id: "r3", cat: "pro", name: "Pulled pork", price: 6000, active: true },
+    { id: "r4", cat: "pro", name: "Cubitos de lomo", price: 7500, active: true },
+    { id: "r5", cat: "pro", name: "Pollo fajitas", price: 7000, active: true },
+    { id: "r6", cat: "pro", name: "Bolitas de pechuga", price: 7500, active: true },
+    { id: "r7", cat: "pro", name: "Albóndigas de res", price: 8000, active: true },
+    { id: "s1", cat: "sal", name: "Tomate casera", price: 2500, active: true },
+    { id: "s2", cat: "sal", name: "Miel BBQ", price: 2500, active: true },
+    { id: "s3", cat: "sal", name: "Sweet and spicy", price: 2500, active: true },
+    { id: "s4", cat: "sal", name: "Pesto", price: 2500, active: true },
+    { id: "s5", cat: "sal", name: "Chimichurri fresco", price: 2500, active: true },
+  ],
+  packs: [
+    { id: "escapada", name: "Escapada", items: { l1: 1, c1: 1 } },
+    { id: "familia", name: "Familia", items: { l1: 1, l2: 1, p1: 1, c1: 1 } },
+    { id: "semana", name: "Semana completa", items: { l1: 1, l2: 1, l3: 1, l7: 1, p1: 1, p2: 1, c1: 1, c2: 1 } },
+  ],
+};

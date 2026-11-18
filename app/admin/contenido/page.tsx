@@ -3,6 +3,7 @@ import { ContentEditor } from "@/components/admin/ContentEditor";
 import { store } from "@/lib/store";
 import { getCycleWindows } from "@/lib/windows";
 import { groupDishes } from "@/lib/dishes";
+import { ViajeEditor } from "@/components/admin/ViajeEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function ContenidoPage() {
   const settings = await store.getSettings();
   const market = await store.getMarket();
   const event = await store.getEvent();
+  const viaje = await store.getViaje();
 
   // Rango de fechas del ciclo actual (primera y última entrega), como prefijo editable del arte.
   const wins = getCycleWindows(settings.menuPublishedAt);
@@ -41,7 +43,9 @@ export default async function ContenidoPage() {
         defaultDateA={defaultDateA}
         defaultDateB={defaultDateB}
         dishHistory={dishHistory}
-      />
+      >
+        <ViajeEditor initial={viaje} />
+      </ContentEditor>
     </AdminShell>
   );
 }

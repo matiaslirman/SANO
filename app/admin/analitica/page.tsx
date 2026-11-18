@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AnaliticaPage() {
   const orders = await store.listOrders();
+  const viajeOrders = await store.listViajeOrders();
   const settings = await store.getSettings();
   const track = await store.getTrack();
 
@@ -17,7 +18,7 @@ export default async function AnaliticaPage() {
           Conectá un store KV (Upstash) en Vercel para el histórico real.
         </div>
       )}
-      <AnaliticaView initial={{ orders, combos: settings.combos, history: settings.history || [], menu: settings.menu, basePrice: settings.basePrice, track }} />
+      <AnaliticaView initial={{ orders, viajeOrders, combos: settings.combos, history: settings.history || [], menu: settings.menu, basePrice: settings.basePrice, track }} />
     </AdminShell>
   );
 }
