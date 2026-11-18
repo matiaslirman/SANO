@@ -16,7 +16,6 @@ import { menuAlertMessage } from "@/lib/favorites";
 import { viajeAlertMessage } from "@/lib/viaje";
 import { MarketStrip, mkey } from "./MarketStrip";
 import { AddStepper } from "./AddStepper";
-import { HeroStrip } from "./HeroStrip";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -479,6 +478,9 @@ export function Ordering({
                     </a>
                   )}
                   {viajeTile}
+                  {/* un detalle de plato real asomando por cada costado (solo asoma lo que queda fuera de las tarjetas) */}
+                  <span className="dish-peek l" aria-hidden="true"><img src="/platos/detalle-vegetales.webp" alt="" width={231} height={334} /></span>
+                  <span className="dish-peek r" aria-hidden="true"><img src="/platos/detalle-salmon.webp" alt="" width={240} height={353} /></span>
                 </div>
 
                 {/* datos que dan confianza: dónde se retira, Proteína Extra (si hay) y la marca */}
@@ -525,7 +527,6 @@ export function Ordering({
         </div>
 
         {/* VITRINA — tira de platos reales que corre en bucle a todo el ancho (solo en el hero público) */}
-        {!isEvent && <HeroStrip />}
       </section>
 
       {/* ============ SHEET ============ */}

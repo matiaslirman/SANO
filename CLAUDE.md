@@ -31,9 +31,12 @@ Next.js 15 (App Router) · React 19 · TypeScript · CSS plano (sin framework de
   `/viaje-sano`; *pronto* → tarjeta atenuada "Disponible pronto" que abre WhatsApp ("Avisame cuando abra", cuenta `viaje_alert`);
   *oculto* → no hay tarjeta. `destacar` ("semana" | "viaje") decide cuál de las dos va rellena en crema (temporada de viajes). Con pedidos
   cerrados la tarjeta de la semana pasa a "Cerrado · Avisarme ↓". Debajo: chips de datos (**"Retiro en 22 Bistro · Ciudad Colón"** y, si hay
-  precio configurado, **"💪 Proteína Extra disponible · desde +₡X"**), una línea de marca (@sanoby22bistro · 4,8★ en Google · atención 1 a 1)
-  y la **vitrina de platos en bucle** (`components/HeroStrip.tsx`, a todo el ancho). En **modo evento** no va la vitrina: el hero es el de
-  siempre, texto a la izquierda y **sello** (`lib/brand · Seal`) a la derecha.
+  precio configurado, **"💪 Proteína Extra disponible · desde +₡X"**) y una línea de marca (@sanoby22bistro · 4,8★ en Google · atención 1 a 1).
+  **Detalle de platos**: asoma un táper real, **a todo color y chiquito**, por el costado exterior de cada tarjeta (`.dish-peek` dentro de
+  `.tiles`; recortes de la vitrina en `public/platos/detalle-vegetales.webp` y `detalle-salmon.webp`). El contenedor mide solo lo que asoma
+  y corta el resto, así no queda nada detrás de las tarjetas translúcidas. Se descartó la tira ancha en bucle (hacía el hero muy alto) y
+  también poner la vitrina tenue de fondo (se veía sucio): si se cambian los platos, recortá otro táper de `vitrina-sano.webp`. En **modo
+  evento** no hay detalle: el hero es el de siempre, texto a la izquierda y **sello** (`lib/brand · Seal`) a la derecha.
 - **Contador del hero** ("Cierra en…" + cupos): lo gobierna `Settings.heroPillMode` (`auto` | `siempre` |
   `nunca`) y `heroPillHours`, editables en **Contenido → Contador del hero**. Por defecto `auto`: solo aparece
   cuando faltan **2 h o menos** para el cierre (y se esconde al cerrar); la pill flotante sigue la misma regla.

@@ -93,15 +93,8 @@ img,svg{max-width:100%}
 .hero-seal{width:min(320px,84%);height:auto;filter:drop-shadow(0 26px 44px rgba(0,0,0,.4));animation:sealFloat 7s ease-in-out infinite;transform-origin:center}
 @keyframes sealFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
 
-/* VITRINA del hero: tira de platos reales a todo el ancho, en bucle continuo (táperes sobre fondo transparente) */
+
 .hero .wrap.hero-wrap-solo{grid-template-columns:1fr;padding-block:28px 18px}
-.hstrip{width:100%;overflow:hidden;margin-top:14px;padding-bottom:46px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%)}
-.hstrip-rail{display:flex;align-items:center;width:max-content;animation:hstripSlide 80s linear infinite;will-change:transform}
-.hstrip-rail.hold{animation-play-state:paused}
-.hstrip-rail img{display:block;height:clamp(200px,26vw,300px);width:auto;user-select:none;-webkit-user-drag:none}
-/* -50% = una mitad exacta (PER_HALF copias) → al terminar, la 2ª mitad cae donde estaba la 1ª: loop sin salto */
-@keyframes hstripSlide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-/* Con "reducir movimiento" la regla global apaga la animación: la tira queda estática y llena el ancho igual. */
 
 /* pop-up de la tarjeta de cliente frecuente (al volver de WhatsApp) */
 .lp-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(20,4,4,.7);backdrop-filter:blur(3px);animation:lpFade .2s ease-out}
@@ -547,12 +540,12 @@ footer .fbrand{margin-bottom:12px}
 /* ============================================================
    PORTADA + MENÚ SEMANAL (rediseño): dos tarjetas en el hero, filas, Market en tira, barra fija
    ============================================================ */
-.hero .wrap.hero-center{text-align:center;justify-items:center;padding-block:30px 6px}
+.hero .wrap.hero-center{text-align:center;justify-items:center;padding-block:30px 50px}
 .hero-center .hero-copy{width:100%;max-width:760px;margin-inline:auto}
 .hero-center .hero-urgency{display:flex;justify-content:center}
 
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;text-align:left}
-.tiles.one{grid-template-columns:minmax(0,420px);justify-content:center}
+.tiles{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;text-align:left}
+.tiles.one{grid-template-columns:1fr;max-width:420px;margin-inline:auto}
 .tile{display:flex;flex-direction:column;gap:6px;min-height:132px;padding:18px 18px 16px;border-radius:18px;text-decoration:none;color:var(--crema);border:1.5px solid rgba(255,241,180,.5);background:rgba(255,241,180,.06);transition:transform .15s,background .15s,border-color .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .tile:active{transform:scale(.985)}
 .tile .t{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-size:1.35rem;line-height:1.05;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -667,10 +660,25 @@ button,a.tile,.wk-day,.mkt-chip,.addstep button{touch-action:manipulation}
 .hero-brand{display:flex;flex-wrap:wrap;gap:4px 11px;justify-content:center;align-items:center;margin-top:12px;font-size:12.5px;color:var(--crema-soft)}
 .hero-brand .sep{width:4px;height:4px;border-radius:50%;background:rgba(255,241,180,.5)}
 .hero-center .hero-urgency{margin-top:14px}
-.hero .wrap + .hstrip{margin-top:10px}
 @media(max-width:600px){
   .hero-facts{margin-top:14px}
   .fact{font-size:13px;padding:6px 12px}
   .hb-extra{display:none}
-  .hstrip{padding-bottom:40px}
+}
+
+/* Detalle de plato asomando por cada costado de las tarjetas. Es un recorte de la vitrina (táper real, a todo color).
+   El contenedor mide solo lo que asoma y corta el resto: así nada queda detrás de las tarjetas translúcidas. */
+.dish-peek{position:absolute;z-index:0;width:40px;height:156px;overflow:hidden;pointer-events:none}
+.dish-peek img{position:absolute;top:12px;width:82px;height:auto;filter:drop-shadow(0 6px 8px rgba(30,4,4,.4))}
+.dish-peek.l{right:calc(100% - 1px);top:-2px}
+.dish-peek.l img{right:0;transform:rotate(-8deg);transform-origin:70% 55%}
+.dish-peek.r{left:calc(100% - 1px);bottom:-6px}
+.dish-peek.r img{left:0;transform:rotate(7deg);transform-origin:30% 45%}
+@media(max-width:600px){
+  /* en el celular las tarjetas se angostan un poco para dejar lugar al detalle: uno por cada costado, en diagonal */
+  .hero-center .hero-copy{padding-inline:26px}
+  .dish-peek{width:36px;height:150px}
+  .dish-peek img{width:76px}
+  .dish-peek.l{top:-8px}
+  .dish-peek.r{bottom:-10px}
 }
