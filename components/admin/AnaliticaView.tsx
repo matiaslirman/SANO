@@ -8,6 +8,7 @@ import { groupDishes } from "@/lib/dishes";
 import { computeInsights, MIN_ORDERS } from "@/lib/insights";
 import { groupCustomers } from "@/lib/customers";
 import { DaySelect, type DayOpt } from "./DaySelect";
+import { orderTrays, plural } from "@/lib/viaje";
 
 function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: string }[]; unit?: string }) {
   if (rows.length === 0) return <div className="empty" style={{ padding: 16 }}>Sin datos todavía.</div>;
@@ -39,9 +40,10 @@ function RankBars({ rows, unit }: { rows: { label: string; value: number; sub?: 
 export function AnaliticaView({
   initial,
 }: {
-  initial: { orders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[]; basePrice: number; track: Record<string, number> };
+  initial: { orders: Order[]; viajeOrders: Order[]; combos: ComboTier[]; history: MonthlyIncome[]; menu: string[]; basePrice: number; track: Record<string, number> };
 }) {
   const [orders, setOrders] = useState<Order[]>(initial.orders);
+  const [viajeOrders, setViajeOrders] = useState<Order[]>(initial.viajeOrders);
   const combos = initial.combos;
   const history = initial.history;
   const menu = initial.menu;
@@ -54,7 +56,8 @@ export function AnaliticaView({
   const [now, setNow] = useState<Date>(() => new Date());
 
   // Ingreso por mes: pedidos pagados por fecha del pedido (hora CR) + consolidado manual, sin duplicar.
-  const monthly = useMemo(() => reconcileMonths(orders, history, now), [orders, history, now]);
+  // El ingreso mensual suma también los pedidos pagados de Viaje Sano (el resto de las métricas es solo del menú semanal).
+  const monthly = useMemo(() => reconcileMonths([...orders, ...viajeOrders], history, now), [orders, viajeOrders, history, now]);
   const curKey = currentMonthKey(now);
   const selKey = sel === "cur" ? curKey : sel;
   const scoped = useMemo(
@@ -97,6 +100,11 @@ export function AnaliticaView({
       if (!r.ok) return;
       const d = await r.json();
       if (Array.isArray(d.orders)) setOrders(d.orders);
+      const rv = await fetch("/api/viaje/orders", { cache: "no-store" });
+      if (rv.ok) {
+        const dv = await rv.json();
+        if (Array.isArray(dv.orders)) setViajeOrders(dv.orders);
+      }
       setNow(new Date()); // el mes en curso se corre solo al cambiar de mes
     } catch {
       /* silencioso */
@@ -265,6 +273,25 @@ export function AnaliticaView({
 
   const hasOrders = a.total > 0;
 
+  // Viaje Sano en el período elegido (mismo filtro de mes: fecha del pedido en hora CR).
+  const vj = useMemo(() => {
+    const list = sel === "all" ? viajeOrders : viajeOrders.filter((o) => crMonthKey(o.createdAt) === selKey);
+    const paid = list.filter((o) => o.status === "pagado");
+    const byItem = new Map<string, { name: string; qty: number }>();
+    for (const o of list) for (const l of o.viaje || []) {
+      const cur = byItem.get(l.id);
+      if (cur) cur.qty += l.qty; else byItem.set(l.id, { name: l.name, qty: l.qty });
+    }
+    return {
+      pedidos: list.length,
+      pagados: paid.length,
+      ingreso: paid.reduce((s, o) => s + o.total, 0),
+      porCobrar: list.filter((o) => o.status !== "pagado").reduce((s, o) => s + o.total, 0),
+      bandejas: list.reduce((s, o) => s + orderTrays(o.viaje || []), 0),
+      top: [...byItem.values()].sort((a, b) => b.qty - a.qty).slice(0, 5),
+    };
+  }, [viajeOrders, sel, selKey]);
+
   const headIncome = sel === "all" ? hist.total : selRow?.income ?? 0;
   const headSub =
     sel === "all"
@@ -325,6 +352,32 @@ export function AnaliticaView({
           <div className="v">{a.pendientes}</div>
         </div>
       </div>
+
+      {viajeOrders.length > 0 && (
+        <div className="editcard vj-an" style={{ marginTop: 24 }}>
+          <h3>Viaje Sano · {sel === "all" ? "todo el tiempo" : monthLabel(selKey)}</h3>
+          <div className="sub">
+            Aparte del menú semanal: no entra en la tasa de pago ni en los rankings, pero <b>sí suma al ingreso del mes</b> (pedidos pagados).
+          </div>
+          {vj.pedidos === 0 ? (
+            <div className="empty">No hay pedidos de Viaje Sano en este período.</div>
+          ) : (
+            <>
+              <div className="astat" style={{ margin: "0 0 12px" }}>
+                <div className="box"><div className="k">Pedidos</div><div className="v">{vj.pedidos}</div></div>
+                <div className="box"><div className="k">Ingreso (pagados)</div><div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(vj.ingreso)}</div></div>
+                <div className="box"><div className="k">Por cobrar</div><div className="v tnum" style={{ fontSize: "1.35rem" }}>{crc(vj.porCobrar)}</div></div>
+                <div className="box"><div className="k">Bandejas</div><div className="v">{vj.bandejas}</div></div>
+              </div>
+              {vj.top.length > 0 && (
+                <p className="aprod-note" style={{ marginTop: 0 }}>
+                  Lo más pedido: {vj.top.map((t) => `${t.name} (${t.qty})`).join(" · ")}. {vj.pagados} {plural(vj.pagados, "pedido pagado", "pedidos pagados")}.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="klabel" style={{ marginTop: 24 }}>
         Ingreso por mes
@@ -470,7 +523,7 @@ export function AnaliticaView({
           </p>
         </>
       )}
-      <p className="aprod-note">Pidieron que les avisen cuando salga el menú (con pedidos cerrados): <b>{track.menu_alert || 0}</b>.</p>
+      <p className="aprod-note">Pidieron que les avisen cuando salga el menú (con pedidos cerrados): <b>{track.menu_alert || 0}</b>. Pidieron que les avisen cuando abra Viaje Sano: <b>{track.viaje_alert || 0}</b>.</p>
 
       {!hasOrders ? (
         <div className="otable" style={{ marginTop: 20 }}>

@@ -258,3 +258,49 @@
 .copy-grid .field label{display:block;font-size:12.5px;font-weight:700;color:var(--bordo-ink);margin-bottom:6px}
 .copy-ta{width:100%;border:1px solid var(--line-strong);border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.5;background:var(--paper);color:var(--ink);resize:vertical;font-family:var(--body)}
 .copy-ta:focus{outline:2px solid var(--bordo);outline-offset:1px}
+
+/* ============ VIAJE SANO (panel) ============ */
+.vj-estado{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px 15px;border-radius:12px;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+.vj-estado .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto;background:var(--muted)}
+.vj-estado.abierto .dot{background:var(--ok)}
+.vj-estado.pronto .dot{background:var(--warn)}
+.vj-estado a{color:var(--bordo);font-weight:600}
+.vj-cook{margin-top:0}
+.vj-cook-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.vj-cook-cat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper)}
+.vj-cook-h{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;color:var(--bordo);font-size:.95rem}
+.vj-cook-h b{font-family:var(--body);text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
+.vj-cook-cat ul{list-style:none;margin:0;padding:0}
+.vj-cook-cat li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px dotted var(--line);font-size:13.5px}
+.vj-cook-cat li b{font-family:var(--disp);font-size:1rem;color:var(--bordo-ink)}
+.vj-date{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.vj-date input{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink)}
+.vj-trays{display:block;margin-top:4px;color:var(--bordo);font-weight:600}
+@media(max-width:700px){.vj-cook-grid{grid-template-columns:1fr}}
+.vj-h4{font-family:var(--disp);color:var(--bordo);text-transform:uppercase;letter-spacing:.04em;font-size:.95rem;margin:24px 0 4px;padding-top:16px;border-top:1px solid var(--line)}
+.vj-estados{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.vj-eopt{text-align:left;display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--paper);cursor:pointer;font:inherit;color:var(--ink);min-height:44px}
+.vj-eopt small{color:var(--muted);font-size:12px;line-height:1.35}
+.vj-eopt.on{border-color:var(--bordo);background:#fff;box-shadow:0 10px 22px -18px rgba(146,26,27,.7)}
+.vj-eopt.on b{color:var(--bordo)}
+.vj-sel{width:100%;border:1px solid var(--line-strong);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;background:var(--paper);color:var(--ink);min-height:42px}
+.vj-ecat{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.vj-ecat-h{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;color:var(--bordo-ink);margin-bottom:8px}
+.vj-ecat-h small{font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px;margin-left:6px}
+.vj-erow{display:grid;grid-template-columns:1.2fr 1.4fr 110px auto;gap:8px;align-items:center;margin-bottom:8px}
+.vj-erow.pk{grid-template-columns:1fr 90px auto}
+.vj-erow.off{opacity:.55}
+.vj-erow input:not([type=checkbox]){border:1px solid var(--line-strong);border-radius:10px;padding:9px 11px;font-size:14px;background:var(--paper);min-width:0;width:100%}
+.vj-erow .num{text-align:right}
+.vj-erow .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap}
+.vj-erow .nm{font-size:14px}
+.vj-epack{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--paper)}
+.vj-epack-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.vj-epack-h input{flex:1;min-width:150px;border:1px solid var(--line-strong);border-radius:10px;padding:9px 11px;font-size:14px;font-weight:600;background:#fff}
+.vj-epack-h .sum{font-size:12.5px;color:var(--muted)}
+@media(max-width:700px){
+  .vj-estados{grid-template-columns:1fr}
+  .vj-erow{grid-template-columns:1fr 100px}
+  .vj-erow input[aria-label="Descripción"]{grid-column:1 / -1;order:3}
+  .vj-erow .chk{order:4}
+}
