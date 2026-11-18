@@ -16,6 +16,7 @@ import { menuAlertMessage } from "@/lib/favorites";
 import { viajeAlertMessage } from "@/lib/viaje";
 import { MarketStrip, mkey } from "./MarketStrip";
 import { AddStepper } from "./AddStepper";
+import { HeroStrip } from "./HeroStrip";
 
 const WA = process.env.NEXT_PUBLIC_WHATSAPP || "50683193498";
 
@@ -106,6 +107,10 @@ export function Ordering({
   // ── el pill de urgencia se despega y sigue al usuario al scrollear ──
   // Pausa: no quedan ventanas abiertas (cerró el ciclo y aún no hay menú nuevo).
   const paused = !isEvent && status.windows.length === 0;
+  // Proteína Extra: ¿algún plato del menú la ofrece? (precio real configurado en Contenido)
+  const extraList = isEvent ? [] : status.menu.map((d) => status.extraPrices?.[d] || 0).filter((p) => p > 0);
+  const extraAvail = !paused && extraList.length > 0;
+  const extraMin = extraList.length ? Math.min(...extraList) : 0;
   const menuAlertHref = `https://wa.me/${WA}?text=${encodeURIComponent(menuAlertMessage(picks))}`;
   const togglePick = (d: string) => setPicks((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const heroPillRef = useRef<HTMLDivElement>(null);
@@ -288,6 +293,10 @@ export function Ordering({
 
   const scrollToMenu = () => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
 
+  // «Retiro vie 20 y lun 23 nov · ₡5.500 c/u»: días de retiro y precio reales del ciclo abierto.
+  const retiroDays = status.windows.map((w) => shortDeliveryLabel(w.deliveryDateLabel));
+  const retiroLine = retiroDays.length ? `Retiro ${retiroDays.join(" y ")} · ${crc(status.basePrice)} c/u` : "";
+
   // Tarjeta de Viaje Sano según el estado que fija el dueño: abierta, «Disponible pronto» o ninguna.
   const viajeFirst = status.viaje?.estado === "abierto" && status.viaje.destacar === "viaje"; // temporada de viajes
   const viajeTile =
@@ -459,6 +468,7 @@ export function Ordering({
                     <a className={`tile ${viajeFirst ? "line" : "fill"}`} href="#menu" onClick={(e) => { e.preventDefault(); scrollToMenu(); }}>
                       <span className="t">Esta semana</span>
                       <span className="s">{!cd.closed && selWin.id ? tileDeadline(selWin.cutoffISO) : "Platos listos para retirar"}</span>
+                      {retiroLine && <span className="s s2">{retiroLine}</span>}
                       <span className="go">Pedir ahora →</span>
                     </a>
                   ) : (
@@ -469,6 +479,30 @@ export function Ordering({
                     </a>
                   )}
                   {viajeTile}
+                </div>
+
+                {/* datos que dan confianza: dónde se retira, Proteína Extra (si hay) y la marca */}
+                <div className="hero-facts">
+                  <span className="fact">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z" />
+                      <circle cx="12" cy="10" r="2.5" />
+                    </svg>
+                    <span>Retiro en <b>22 Bistro</b> · Ciudad Colón</span>
+                  </span>
+                  {extraAvail && (
+                    <button type="button" className="fact fact-btn" onClick={scrollToMenu}>
+                      <span aria-hidden="true">💪</span>
+                      <span>{PROTEIN_EXTRA_LABEL} disponible<span className="fact-p tnum"> · desde +{crc(extraMin)}</span></span>
+                    </button>
+                  )}
+                </div>
+                <div className="hero-brand">
+                  <span>@sanoby22bistro</span>
+                  <span className="sep" aria-hidden="true" />
+                  <span>4,8★ en Google</span>
+                  <span className="sep hb-extra" aria-hidden="true" />
+                  <span className="hb-extra">Atención personalizada 1 a 1</span>
                 </div>
 
                 {/* contador: solo cuando faltan pocas horas para el cierre (regla de Contenido → Contador del hero) */}
@@ -491,6 +525,7 @@ export function Ordering({
         </div>
 
         {/* VITRINA — tira de platos reales que corre en bucle a todo el ancho (solo en el hero público) */}
+        {!isEvent && <HeroStrip />}
       </section>
 
       {/* ============ SHEET ============ */}

@@ -547,7 +547,7 @@ footer .fbrand{margin-bottom:12px}
 /* ============================================================
    PORTADA + MENÚ SEMANAL (rediseño): dos tarjetas en el hero, filas, Market en tira, barra fija
    ============================================================ */
-.hero .wrap.hero-center{text-align:center;justify-items:center;padding-block:30px 52px}
+.hero .wrap.hero-center{text-align:center;justify-items:center;padding-block:30px 6px}
 .hero-center .hero-copy{width:100%;max-width:760px;margin-inline:auto}
 .hero-center .hero-urgency{display:flex;justify-content:center}
 
@@ -653,3 +653,24 @@ button,a.tile,.wk-day,.mkt-chip,.addstep button{touch-action:manipulation}
 .mkt-card .mrow{margin-top:auto}
 .nav a{white-space:nowrap}
 @media(max-width:480px){.nav a:not(.cta):first-child{display:none}}
+
+/* Hero: datos que dan confianza (retiro en 22 Bistro, Proteína Extra, marca) + vitrina en bucle */
+.tile .s.s2{margin-top:-2px;font-size:12.5px;color:var(--crema)}
+.tile.fill .s.s2{color:var(--bordo-ink);font-weight:600}
+.hero-facts{display:flex;flex-wrap:wrap;gap:8px 10px;justify-content:center;margin-top:16px}
+.fact{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:6px 13px;border-radius:999px;border:1px solid rgba(255,241,180,.4);background:rgba(255,241,180,.1);color:var(--crema);font-family:var(--body);font-size:13.5px;font-weight:500;line-height:1.2}
+.fact b{font-weight:700;color:#fff}
+.fact svg{flex:0 0 auto;opacity:.9}
+.fact-btn{cursor:pointer;touch-action:manipulation;transition:background .15s,border-color .15s}
+.fact-btn:hover{background:rgba(255,241,180,.2);border-color:var(--crema)}
+.fact-p{color:var(--crema-soft);font-weight:500}
+.hero-brand{display:flex;flex-wrap:wrap;gap:4px 11px;justify-content:center;align-items:center;margin-top:12px;font-size:12.5px;color:var(--crema-soft)}
+.hero-brand .sep{width:4px;height:4px;border-radius:50%;background:rgba(255,241,180,.5)}
+.hero-center .hero-urgency{margin-top:14px}
+.hero .wrap + .hstrip{margin-top:10px}
+@media(max-width:600px){
+  .hero-facts{margin-top:14px}
+  .fact{font-size:13px;padding:6px 12px}
+  .hb-extra{display:none}
+  .hstrip{padding-bottom:40px}
+}
