@@ -3,13 +3,14 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { Redis } from "@upstash/redis";
-import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus } from "./types";
-import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT } from "./defaults";
+import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus, ViajeSettings } from "./types";
+import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT, DEFAULT_VIAJE } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
 import type { TrackEvent } from "./track";
 import { normalizeEmail } from "./contact";
 import { topDishes } from "./favorites";
+import { normalizeViaje, isRealDate, longDate, type ViajeOrderCheck } from "./viaje";
 
 const K = {
   settings: "sano:settings",
@@ -19,6 +20,7 @@ const K = {
   kitchen: "sano:kitchen", // hash: windowId -> string[] (claves de ítems completados)
   event: "sano:event", // configuración del evento privado
   track: "sano:track", // hash: evento -> contador (pop-up de la tarjeta, aviso de menú)
+  viaje: "sano:viaje", // configuración de Viaje Sano (estado, catálogo, packs, regalos)
 };
 
 /** Clave estable del evento (agrupa sus pedidos) derivada del título. */
@@ -215,13 +217,89 @@ export const store = {
     return { event, eventId, status };
   },
 
+  // ── Viaje Sano ──────────────────────────────────────────────
+  async getViaje(): Promise<ViajeSettings> {
+    if (isPersistent()) {
+      const v = (await redis().get<Partial<ViajeSettings>>(K.viaje)) || null;
+      if (!v) return DEFAULT_VIAJE;
+      return normalizeViaje(v, DEFAULT_VIAJE);
+    }
+    const db = await readFile();
+    return db.viaje || DEFAULT_VIAJE;
+  },
+
+  async saveViaje(patch: Partial<ViajeSettings>): Promise<ViajeSettings> {
+    const current = await this.getViaje();
+    const next = normalizeViaje({ ...current, ...patch }, DEFAULT_VIAJE);
+    if (isPersistent()) {
+      await redis().set(K.viaje, next);
+    } else {
+      const db = await readFile();
+      db.viaje = next;
+      await writeFile(db);
+    }
+    return next;
+  },
+
+  /** Crea un pedido de Viaje Sano ya validado (ver `checkViajeOrder`). Comparte la numeración SANO-<n>. */
+  async createViajeOrder(c: Extract<ViajeOrderCheck, { ok: true }>): Promise<Order> {
+    const seq = await this.nextSeq();
+    const id = `SANO-${seq}`;
+    const order: Order = {
+      id,
+      seq,
+      createdAt: new Date().toISOString(),
+      windowId: "viaje",
+      windowLabel: `Viaje Sano · retiro ${longDate(c.pickupDate)}`,
+      customerName: c.name.slice(0, 80),
+      whatsapp: c.whatsapp,
+      notes: c.notes,
+      dishes: [],
+      market: [],
+      dishesQty: 0,
+      dishesTotal: 0,
+      marketTotal: 0,
+      total: c.total,
+      status: "pendiente",
+      completed: false,
+      kind: "viaje",
+      pickupDate: c.pickupDate,
+      pickupConfirmed: false,
+      viaje: c.lines,
+      ...(c.packId ? { viajePack: c.packId } : {}),
+      ...(c.gift ? { viajeGift: c.gift.text } : {}),
+    };
+    if (isPersistent()) {
+      await redis().hset(K.orders, { [id]: order });
+    } else {
+      const db = await readFile();
+      db.orders[id] = order;
+      await writeFile(db);
+    }
+    return order;
+  },
+
   /** Qué se muestra con los pedidos cerrados: el menú que cerró y los platos más pedidos (solo nombres). */
   async getClosedShowcase(menu: string[]): Promise<{ thisWeek: string[]; favorites: string[] }> {
     const orders = await this.listOrders();
     return { thisWeek: menu, favorites: topDishes(orders, menu) };
   },
 
+  /**
+   * Pedidos del ciclo semanal y de eventos privados. Los de Viaje Sano NO vienen acá a propósito: no tienen
+   * ventana, no usan cupos y no son platos del menú. Para ellos están `listViajeOrders` y `listAllOrders`.
+   */
   async listOrders(): Promise<Order[]> {
+    return (await this.listAllOrders()).filter((o) => o.kind !== "viaje");
+  },
+
+  /** Solo los pedidos de Viaje Sano, el más reciente primero. */
+  async listViajeOrders(): Promise<Order[]> {
+    return (await this.listAllOrders()).filter((o) => o.kind === "viaje");
+  },
+
+  /** Todos los pedidos, de cualquier tipo (para el ingreso del negocio). */
+  async listAllOrders(): Promise<Order[]> {
     let orders: Order[];
     if (isPersistent()) {
       const all = (await redis().hgetall<Record<string, Order>>(K.orders)) || {};
@@ -366,12 +444,20 @@ export const store = {
 
   async updateOrder(
     id: string,
-    patch: { status?: OrderStatus; completed?: boolean }
+    patch: { status?: OrderStatus; completed?: boolean; pickupDate?: string; pickupConfirmed?: boolean }
   ): Promise<Order | null> {
     const order = await this.getOrder(id);
     if (!order) return null;
     if (patch.status === "pendiente" || patch.status === "pagado") order.status = patch.status;
     if (typeof patch.completed === "boolean") order.completed = patch.completed;
+    if (order.kind === "viaje") {
+      if (isRealDate(patch.pickupDate)) {
+        order.pickupDate = patch.pickupDate;
+        order.windowLabel = `Viaje Sano · retiro ${longDate(patch.pickupDate)}`;
+        order.pickupConfirmed = false; // cambió la fecha: hay que volver a confirmarla
+      }
+      if (typeof patch.pickupConfirmed === "boolean") order.pickupConfirmed = patch.pickupConfirmed;
+    }
     if (isPersistent()) {
       await redis().hset(K.orders, { [id]: order });
     } else {
@@ -562,6 +648,7 @@ interface DbFile {
   kitchen?: Record<string, Record<string, number>>;
   event?: EventSettings;
   track?: Record<string, number>;
+  viaje?: ViajeSettings;
 }
 
 function dataFile(): string {
@@ -583,9 +670,10 @@ async function readFile(): Promise<DbFile> {
       kitchen: parsed.kitchen || {},
       track: parsed.track || {},
       event: parsed.event ? { ...DEFAULT_EVENT, ...parsed.event } : DEFAULT_EVENT,
+      viaje: parsed.viaje ? normalizeViaje(parsed.viaje, DEFAULT_VIAJE) : DEFAULT_VIAJE,
     };
   } catch {
-    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0, kitchen: {}, event: DEFAULT_EVENT };
+    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0, kitchen: {}, event: DEFAULT_EVENT, viaje: DEFAULT_VIAJE };
   }
 }
 

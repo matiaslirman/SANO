@@ -83,4 +83,11 @@ assert.ok(!inRange("2026-10-20T15:00:00Z", "30d", nowR)); // futuro: no
 assert.ok(inRange("2026-08-15T15:00:00Z", "2026-08", nowR));
 assert.ok(!inRange("basura", "cur", nowR));
 
+// Viaje Sano suma al ingreso del mes (Analítica pasa los pedidos de viaje junto con los semanales).
+{
+  const vj = { id: "SANO-9", seq: 9, createdAt: "2026-10-10T15:00:00Z", total: 71000, status: "pagado", kind: "viaje" } as never;
+  const rows2 = reconcileMonths([o(1, "2026-10-02T15:00:00Z", 60000, "pagado"), o(2, "2026-10-09T15:00:00Z", 70000, "pagado"), vj], hist, now);
+  assert.equal(rows2.find((r) => r.month === "2026-10")!.income, 60000 + 70000 + 71000);
+}
+
 console.log("months: todos los tests OK");

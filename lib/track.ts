@@ -5,6 +5,7 @@ export const TRACK_EVENTS = [
   "loyalty_have",     // tocó "Ya la tengo"
   "loyalty_later",    // cerró / "Ahora no"
   "menu_alert",       // tocó "Avisame cuando salga el menú" con los pedidos cerrados
+  "viaje_alert",      // tocó "Avisame cuando abra" en la tarjeta «Disponible pronto» de Viaje Sano
 ] as const;
 export type TrackEvent = (typeof TRACK_EVENTS)[number];
 
