@@ -4,12 +4,14 @@ import { getClientWindows } from "./windows";
 import { resolveExtraPrices } from "./pricing";
 import { resolveHeroPill } from "./hero";
 import { popularInMenu } from "./favorites";
+import { bscOpen } from "./bsc";
 import type { PublicStatus, WindowInfo } from "./types";
 
 /** Estado público del menú semanal: lo comparten la landing (`/`) y `GET /api/status`. */
 export async function buildPublicStatus(): Promise<PublicStatus> {
   const settings = await store.getSettings();
   const viaje = await store.getViaje();
+  const bsc = await store.getBsc();
 
   const windows: WindowInfo[] = await Promise.all(
     getClientWindows(settings.menuPublishedAt).map(async (w): Promise<WindowInfo> => {
@@ -37,6 +39,7 @@ export async function buildPublicStatus(): Promise<PublicStatus> {
     extraPrices: resolveExtraPrices(settings),
     heroPill: resolveHeroPill(settings),
     viaje: { estado: viaje.estado, fecha: viaje.fecha, destacar: viaje.destacar },
+    ...(bscOpen(new Date(), bsc) ? { bsc: true } : {}), // la pestaña del evento solo aparece dentro de su ventana
     ...(popular.length ? { popular } : {}),
     ...(windows.length === 0 ? { closed: await store.getClosedShowcase(settings.menu) } : {}),
   };

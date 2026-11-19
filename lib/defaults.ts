@@ -1,4 +1,4 @@
-import type { Settings, MarketCategory, EventSettings, MonthlyIncome, ViajeSettings } from "./types";
+import type { Settings, MarketCategory, EventSettings, MonthlyIncome, ViajeSettings, BscSettings } from "./types";
 
 /**
  * Ingreso histórico del negocio (hoja "SANO MONTHLY REPORT"), sep-2025 → oct-2026.
@@ -202,5 +202,45 @@ export const DEFAULT_VIAJE: ViajeSettings = {
     { id: "escapada", name: "Escapada", items: { l1: 1, c1: 1 } },
     { id: "familia", name: "Familia", items: { l1: 1, l2: 1, p1: 1, c1: 1 } },
     { id: "semana", name: "Semana completa", items: { l1: 1, l2: 1, l3: 1, l7: 1, p1: 1, p2: 1, c1: 1, c2: 1 } },
+  ],
+};
+
+// ── Bistro Social Club (evento del jueves 19 de noviembre de 2026) ───────────
+// Fuente de verdad: el traspaso del evento. Las fechas llevan la zona de Costa Rica (UTC−6, sin horario de verano).
+export const DEFAULT_BSC: BscSettings = {
+  enabled: true,
+  slug: "bistro-social-club",
+  name: "Bistro Social Club",
+  venue: "22Bistro · Ciudad Colón",
+  startsAt: "2026-11-19T19:30:00-06:00",
+  availableFrom: "2026-11-19T00:00:00-06:00",
+  availableUntil: "2026-11-20T08:00:00-06:00",
+  items: [
+    {
+      id: "gin-tonic", cat: "tragos", name: "Gin Tonic", price: 5000, promoTrigger: true, active: true, image: "gintonic.jpg",
+      desc: "Beefeater + reducción de frutos rojos o maracuyá, o clásico + tónica + hielo.",
+      variants: [{ id: "frutos-rojos", name: "Frutos rojos" }, { id: "maracuya", name: "Maracuyá" }, { id: "clasico", name: "Clásico" }],
+    },
+    {
+      id: "paloma", cat: "tragos", name: "Paloma", price: 5000, promoTrigger: true, active: true, image: "paloma.jpg",
+      desc: "José Cuervo añejo + borde de tajín + reducción de tamarindo o fresca + limón + hielo.",
+      variants: [{ id: "tamarindo", name: "Tamarindo" }, { id: "fresca", name: "Fresca" }],
+    },
+    {
+      id: "playero", cat: "tragos", name: "Playero", price: 5000, promoTrigger: true, active: true, image: "playero.jpg",
+      desc: "Malibu + jugo de naranja + leche de coco + piña.",
+    },
+    { id: "cerveza", cat: "bebidas", name: "Cerveza", price: 2000, active: true },
+    {
+      // La carta dice «₡3.500 / ₡4.000» sin aclarar qué distingue los dos precios: quedan como dos variantes
+      // con nombre neutro hasta que el dueño las renombre en el panel (Comanda → Configuración).
+      id: "vino", cat: "bebidas", name: "Vino", price: 0, active: true,
+      variants: [{ id: "v3500", name: "Opción ₡3.500", price: 3500 }, { id: "v4000", name: "Opción ₡4.000", price: 4000 }],
+    },
+    { id: "papitas-pinterest", cat: "picar", name: "Papitas Pinterest", price: 3000, promoEligible: true, active: true, image: "papitas.jpg", desc: "Papas fritas, chorizo español, aceitunas, guindilla y parmesano rallado por encima." },
+    { id: "fondue", cat: "picar", name: "Fondue de queso", price: 3000, promoEligible: true, active: true, image: "fondue.jpg", desc: "Con pan de ajo y especias." },
+    { id: "guacamole", cat: "picar", name: "Guacamole", price: 3000, promoEligible: true, active: true, image: "guacamole.jpg", desc: "Con chips." },
+    { id: "platito-mixto", cat: "picar", name: "Platito mixto", price: 3000, promoEligible: true, active: true, image: "platito.jpg", desc: "Hongos, queso marinado, aceitunas, chorizo español y guindilla." },
+    { id: "hummus", cat: "picar", name: "Hummus", price: 3000, promoEligible: true, active: true, image: "hummus.jpg", desc: "Con vegetales." },
   ],
 };

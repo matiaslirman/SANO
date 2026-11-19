@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { isAdmin } from "@/lib/auth-server";
-import type { OrderStatus } from "@/lib/types";
+import type { BscPrep, OrderStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   const { id } = await params;
-  let body: { status?: OrderStatus; completed?: boolean; renumber?: number; window?: string; pickupDate?: string; pickupConfirmed?: boolean };
+  let body: { status?: OrderStatus; completed?: boolean; renumber?: number; window?: string; pickupDate?: string; pickupConfirmed?: boolean; bscPrep?: BscPrep };
   try {
     body = await req.json();
   } catch {
@@ -23,6 +23,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const target = await store.getOrder(id);
     if (target?.kind === "viaje") {
       return NextResponse.json({ error: "Los pedidos de Viaje Sano no usan ventanas: cambiá la fecha de retiro." }, { status: 400 });
+    }
+    if (target?.kind === "bsc") {
+      return NextResponse.json({ error: "Los pedidos de Bistro Social Club no usan ventanas de entrega." }, { status: 400 });
     }
     try {
       const order = await store.setOrderWindow(id, body.window);
@@ -52,7 +55,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const hasStatus = body.status === "pendiente" || body.status === "pagado";
   const hasCompleted = typeof body.completed === "boolean";
   const hasPickup = typeof body.pickupDate === "string" || typeof body.pickupConfirmed === "boolean";
-  if (!hasStatus && !hasCompleted && !hasPickup) {
+  const hasPrep = body.bscPrep === "recibido" || body.bscPrep === "preparando" || body.bscPrep === "entregado";
+  if (!hasStatus && !hasCompleted && !hasPickup && !hasPrep) {
     return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
   }
   const order = await store.updateOrder(id, {
@@ -60,6 +64,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     completed: hasCompleted ? body.completed : undefined,
     pickupDate: typeof body.pickupDate === "string" ? body.pickupDate : undefined,
     pickupConfirmed: typeof body.pickupConfirmed === "boolean" ? body.pickupConfirmed : undefined,
+    bscPrep: hasPrep ? body.bscPrep : undefined,
   });
   if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   const cupos = await store.computeCupos();

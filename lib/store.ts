@@ -3,14 +3,15 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { Redis } from "@upstash/redis";
-import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus, ViajeSettings } from "./types";
-import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT, DEFAULT_VIAJE } from "./defaults";
+import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus, ViajeSettings, BscSettings, BscPrep } from "./types";
+import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT, DEFAULT_VIAJE, DEFAULT_BSC } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
 import type { TrackEvent } from "./track";
 import { normalizeEmail } from "./contact";
 import { topDishes } from "./favorites";
 import { normalizeViaje, isRealDate, longDate, type ViajeOrderCheck } from "./viaje";
+import { normalizeBsc, type BscOrderCheck } from "./bsc";
 
 const K = {
   settings: "sano:settings",
@@ -21,6 +22,7 @@ const K = {
   event: "sano:event", // configuración del evento privado
   track: "sano:track", // hash: evento -> contador (pop-up de la tarjeta, aviso de menú)
   viaje: "sano:viaje", // configuración de Viaje Sano (estado, catálogo, packs, regalos)
+  bsc: "sano:bsc", // configuración del evento Bistro Social Club (ventana, carta)
 };
 
 /** Clave estable del evento (agrupa sus pedidos) derivada del título. */
@@ -279,6 +281,71 @@ export const store = {
     return order;
   },
 
+  // ── Bistro Social Club (evento temporal) ────────────────────
+  async getBsc(): Promise<BscSettings> {
+    if (isPersistent()) {
+      const v = (await redis().get<Partial<BscSettings>>(K.bsc)) || null;
+      if (!v) return DEFAULT_BSC;
+      return normalizeBsc(v, DEFAULT_BSC);
+    }
+    const db = await readFile();
+    return db.bsc || DEFAULT_BSC;
+  },
+
+  async saveBsc(patch: Partial<BscSettings>): Promise<BscSettings> {
+    const current = await this.getBsc();
+    const next = normalizeBsc({ ...current, ...patch }, DEFAULT_BSC);
+    if (isPersistent()) {
+      await redis().set(K.bsc, next);
+    } else {
+      const db = await readFile();
+      db.bsc = next;
+      await writeFile(db);
+    }
+    return next;
+  },
+
+  /** Crea un pedido del evento ya validado (ver `checkBscOrder`). Comparte la numeración SANO-<n>. */
+  async createBscOrder(c: Extract<BscOrderCheck, { ok: true }>): Promise<Order> {
+    const seq = await this.nextSeq();
+    const id = `SANO-${seq}`;
+    const order: Order = {
+      id,
+      seq,
+      createdAt: new Date().toISOString(),
+      windowId: "bsc",
+      windowLabel: "Bistro Social Club",
+      customerName: c.name.slice(0, 80),
+      whatsapp: c.whatsapp,
+      notes: c.notes,
+      dishes: [],
+      market: [],
+      dishesQty: 0,
+      dishesTotal: 0,
+      marketTotal: 0,
+      total: c.total,
+      status: "pendiente",
+      completed: false,
+      kind: "bsc",
+      bsc: c.lines,
+      bscPrep: "recibido",
+      ...(c.table ? { bscTable: c.table } : {}),
+    };
+    if (isPersistent()) {
+      await redis().hset(K.orders, { [id]: order });
+    } else {
+      const db = await readFile();
+      db.orders[id] = order;
+      await writeFile(db);
+    }
+    return order;
+  },
+
+  /** Solo los pedidos del evento, el más reciente primero. */
+  async listBscOrders(): Promise<Order[]> {
+    return (await this.listAllOrders()).filter((o) => o.kind === "bsc");
+  },
+
   /** Qué se muestra con los pedidos cerrados: el menú que cerró y los platos más pedidos (solo nombres). */
   async getClosedShowcase(menu: string[]): Promise<{ thisWeek: string[]; favorites: string[] }> {
     const orders = await this.listOrders();
@@ -286,11 +353,12 @@ export const store = {
   },
 
   /**
-   * Pedidos del ciclo semanal y de eventos privados. Los de Viaje Sano NO vienen acá a propósito: no tienen
-   * ventana, no usan cupos y no son platos del menú. Para ellos están `listViajeOrders` y `listAllOrders`.
+   * Pedidos del ciclo semanal y de eventos privados. Los de Viaje Sano y los de Bistro Social Club NO vienen acá
+   * a propósito: no tienen ventana, no usan cupos y no son platos del menú. Para ellos están `listViajeOrders`,
+   * `listBscOrders` y `listAllOrders`.
    */
   async listOrders(): Promise<Order[]> {
-    return (await this.listAllOrders()).filter((o) => o.kind !== "viaje");
+    return (await this.listAllOrders()).filter((o) => o.kind !== "viaje" && o.kind !== "bsc");
   },
 
   /** Solo los pedidos de Viaje Sano, el más reciente primero. */
@@ -444,12 +512,15 @@ export const store = {
 
   async updateOrder(
     id: string,
-    patch: { status?: OrderStatus; completed?: boolean; pickupDate?: string; pickupConfirmed?: boolean }
+    patch: { status?: OrderStatus; completed?: boolean; pickupDate?: string; pickupConfirmed?: boolean; bscPrep?: BscPrep }
   ): Promise<Order | null> {
     const order = await this.getOrder(id);
     if (!order) return null;
     if (patch.status === "pendiente" || patch.status === "pagado") order.status = patch.status;
     if (typeof patch.completed === "boolean") order.completed = patch.completed;
+    if (order.kind === "bsc" && (patch.bscPrep === "recibido" || patch.bscPrep === "preparando" || patch.bscPrep === "entregado")) {
+      order.bscPrep = patch.bscPrep;
+    }
     if (order.kind === "viaje") {
       if (isRealDate(patch.pickupDate)) {
         order.pickupDate = patch.pickupDate;
@@ -649,6 +720,7 @@ interface DbFile {
   event?: EventSettings;
   track?: Record<string, number>;
   viaje?: ViajeSettings;
+  bsc?: BscSettings;
 }
 
 function dataFile(): string {
@@ -671,9 +743,10 @@ async function readFile(): Promise<DbFile> {
       track: parsed.track || {},
       event: parsed.event ? { ...DEFAULT_EVENT, ...parsed.event } : DEFAULT_EVENT,
       viaje: parsed.viaje ? normalizeViaje(parsed.viaje, DEFAULT_VIAJE) : DEFAULT_VIAJE,
+      bsc: parsed.bsc ? normalizeBsc(parsed.bsc, DEFAULT_BSC) : DEFAULT_BSC,
     };
   } catch {
-    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0, kitchen: {}, event: DEFAULT_EVENT, viaje: DEFAULT_VIAJE };
+    return { settings: DEFAULT_SETTINGS, market: DEFAULT_MARKET, orders: {}, seq: 0, kitchen: {}, event: DEFAULT_EVENT, viaje: DEFAULT_VIAJE, bsc: DEFAULT_BSC };
   }
 }
 
