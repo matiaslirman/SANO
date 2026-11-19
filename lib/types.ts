@@ -101,12 +101,16 @@ export interface Order {
   completed?: boolean; // "tachado" — entregado/completado por el dueño
   eventId?: string;    // si viene de un evento privado: clave del evento (agrupa su pestaña)
   /** Pedido de Viaje Sano: vive aparte del ciclo semanal (sin ventana, sin cupos, sin platos del menú). */
-  kind?: "viaje";
+  kind?: "viaje" | "bsc";
   pickupDate?: string;       // viaje: fecha de retiro elegida por el cliente (YYYY-MM-DD, hora CR)
   pickupConfirmed?: boolean; // viaje: el dueño ya confirmó fecha y hora por WhatsApp
   viaje?: OrderViajeLine[];  // viaje: bandejas y extras con el precio de ese momento
   viajePack?: string;        // viaje: pack con el que empezó el pedido (si lo hubo)
   viajeGift?: string;        // viaje: regalo por volumen que ganó (texto)
+  /** Pedido del evento Bistro Social Club: vive aparte del ciclo semanal (sin ventana ni cupos). */
+  bsc?: OrderBscLine[];      // bsc: tragos, bebidas y platos para picar, con el precio de ese momento
+  bscTable?: string;         // bsc: mesa o referencia que dejó la persona (opcional)
+  bscPrep?: BscPrep;         // bsc: estado de preparación (barra / cocina)
 }
 
 export interface WindowInfo {
@@ -132,6 +136,8 @@ export interface PublicStatus {
   closed?: { thisWeek: DishName[]; favorites: DishName[] };
   /** Viaje Sano: lo que decide si el hero muestra la tarjeta (abierta, «Disponible pronto» o nada). Ausente en el evento. */
   viaje?: { estado: ViajeEstado; fecha: string; destacar: "semana" | "viaje" };
+  /** Bistro Social Club: true solo mientras está dentro de su ventana de pedidos (si no, la pestaña no aparece). */
+  bsc?: boolean;
   /** Platos de este menú que están entre los más pedidos de siempre (datos reales). Ausente si hay pocos pedidos. */
   popular?: DishName[];
 }
@@ -186,4 +192,58 @@ export interface OrderViajeLine {
   qty: number;
   unitPrice: number;
   subtotal: number;
+}
+
+// ── Bistro Social Club (evento temporal con carta, promo y comanda) ──────────
+
+export type BscPrep = "recibido" | "preparando" | "entregado";
+export type BscCatId = "tragos" | "bebidas" | "picar";
+
+export interface BscVariant {
+  id: string;
+  name: string;
+  /** Solo si la variante cambia el precio (p. ej. el vino). Si falta, usa el precio del ítem. */
+  price?: number;
+}
+
+export interface BscItem {
+  id: string;
+  cat: BscCatId;
+  name: string;
+  desc?: string;
+  price: number; // 0 cuando el precio lo fija cada variante
+  /** Variantes: si hay, la persona elige una (obligatorio). */
+  variants?: BscVariant[];
+  image?: string; // ruta bajo /bsc/fotos
+  /** Con al menos uno de estos en la cuenta se activa la promo. */
+  promoTrigger?: boolean;
+  /** Estos platos pueden salir incluidos por la promo (el primero de la cuenta). */
+  promoEligible?: boolean;
+  active: boolean;
+}
+
+export interface BscSettings {
+  /** Interruptor general: apagado, no hay pestaña, ni página, ni pedidos (la comanda del panel sí queda). */
+  enabled: boolean;
+  slug: string;
+  name: string;
+  venue: string;
+  startsAt: string;       // inicio del evento (ISO con zona), solo para mostrar
+  availableFrom: string;  // desde cuándo se ve y acepta pedidos (ISO)
+  availableUntil: string; // hasta cuándo (ISO)
+  items: BscItem[];
+}
+
+/** Línea de un pedido del evento: con el precio del momento (el servidor es la autoridad). */
+export interface OrderBscLine {
+  id: string;
+  cat: BscCatId;
+  name: string;
+  variantId?: string;
+  variantName?: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
+  promoTrigger?: boolean;
+  promoEligible?: boolean;
 }

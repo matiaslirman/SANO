@@ -304,3 +304,74 @@
   .vj-erow input[aria-label="Descripción"]{grid-column:1 / -1;order:3}
   .vj-erow .chk{order:4}
 }
+
+/* ============ BISTRO SOCIAL CLUB (comanda del staff: tablet/celular, letra grande, botones de 44 px) ============ */
+.bsc-adm-state{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:16px;padding:12px 15px;border-radius:12px;font-size:14px;border:1px solid var(--line);background:#fff}
+.bsc-adm-state .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+.bsc-adm-state.open .dot{background:var(--ok)}
+.bsc-adm-state.before .dot{background:var(--warn)}
+.bsc-adm-state .obtn{margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.bsc-adm-stats{grid-template-columns:repeat(5,1fr)}
+.bsc-adm-stats .v .of{font-size:.9rem;color:var(--muted);font-weight:400}
+.bsc-adm-stats .box.accent .v .of{color:var(--crema-soft)}
+.bsc-adm-prep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.bsc-adm-prep-grid .cat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper)}
+.bsc-adm-prep-grid .h{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;color:var(--bordo);margin-bottom:6px}
+.bsc-adm-prep-grid ul{list-style:none;margin:0;padding:0}
+.bsc-adm-prep-grid li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px dotted var(--line);font-size:16px}
+.bsc-adm-prep-grid li b{font-family:var(--disp);font-size:1.25rem;color:var(--bordo-ink)}
+.bsc-adm-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin:16px 0}
+.bsc-adm-filters{display:flex;flex-wrap:wrap;gap:8px}
+.bsc-adm-filters button{min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line-strong);background:#fff;font:inherit;font-weight:600;font-size:14px;color:var(--bordo-ink);cursor:pointer;touch-action:manipulation}
+.bsc-adm-filters button.on{background:var(--bordo);border-color:var(--bordo);color:var(--crema)}
+.bsc-adm-actions{display:flex;gap:8px}
+.bsc-adm-actions .obtn{min-height:44px}
+.bsc-adm-accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;align-items:start}
+.bsc-adm-acc{background:#fff;border:1.5px solid var(--line-strong);border-radius:16px;padding:16px}
+.bsc-adm-acc.paid{opacity:.72}
+.bsc-adm-acc .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.bsc-adm-acc h3{font-family:var(--disp);font-size:1.4rem;color:var(--bordo-ink);line-height:1.1;overflow-wrap:anywhere}
+.bsc-adm-acc .hd p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.bsc-adm-acc .tot{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.bsc-adm-acc .tot b{font-family:var(--disp);font-size:1.6rem;color:var(--bordo)}
+.bsc-adm-acc .orders{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.bsc-adm-acc .ord{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--paper)}
+.bsc-adm-acc .ord.entregado{opacity:.7}
+.bsc-adm-acc .ord .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.bsc-adm-acc .ord .id{font-size:12.5px;color:var(--muted);font-weight:600}
+.bsc-adm-acc .ord .ctl{display:flex;gap:6px;align-items:center}
+.bsc-adm-acc .ord .ctl .obtn{min-height:44px;min-width:44px}
+.bsc-adm-acc .prep{min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid var(--bordo);background:#fff;color:var(--bordo);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer;touch-action:manipulation}
+.bsc-adm-acc .prep.preparando{background:#FBF1DE;border-color:var(--warn);color:var(--warn)}
+.bsc-adm-acc .prep.entregado{background:#EAF4EC;border-color:var(--ok);color:var(--ok);cursor:default}
+.bsc-adm-acc .ord ul{list-style:none;margin:8px 0 0;padding:0}
+.bsc-adm-acc .ord li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px dotted var(--line);font-size:16px}
+.bsc-adm-acc .ord li em{font-style:normal;color:var(--bordo);font-weight:700;font-size:13px}
+.bsc-adm-acc .ft{margin-top:12px;padding-top:12px;border-top:1.5px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.bsc-adm-acc .sum{display:flex;flex-direction:column;gap:2px;font-size:14px;color:var(--muted)}
+.bsc-adm-acc .sum b{color:var(--ink);margin-left:6px}
+.bsc-adm-acc .sum .promo{color:var(--bordo)}
+.bsc-adm-pay{min-height:48px;padding:0 20px;border-radius:12px;border:0;background:var(--bordo);color:var(--crema);font-family:var(--disp);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:1rem;cursor:pointer;touch-action:manipulation}
+.bsc-adm-pay.undo{background:#fff;color:var(--bordo);border:1.5px solid var(--bordo)}
+.bsc-adm-edit{margin-top:24px}
+.bsc-adm-edit summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.bsc-adm-item{border-bottom:1px dotted var(--line);padding:8px 0}
+.bsc-adm-item.off{opacity:.55}
+.bsc-adm-item .row{display:grid;grid-template-columns:1.4fr 120px auto auto;gap:8px;align-items:center;margin-bottom:6px}
+.bsc-adm-item .row.var{grid-template-columns:90px 1.4fr 120px;margin-left:12px}
+.bsc-adm-item .vlbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.bsc-adm-item input:not([type=checkbox]){border:1px solid var(--line-strong);border-radius:10px;padding:9px 11px;font-size:14px;background:var(--paper);min-width:0;width:100%}
+.bsc-adm-item .num{text-align:right}
+.bsc-adm-item .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap}
+@media(max-width:900px){.bsc-adm-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){
+  .bsc-adm-accounts{grid-template-columns:1fr}
+  .bsc-adm-item .row{grid-template-columns:1fr 100px}
+  .bsc-adm-item .row.var{grid-template-columns:1fr 100px;margin-left:0}
+  .bsc-adm-item .row.var .vlbl{grid-column:1 / -1}
+}
+@media print{
+  .admin-top,.tabs,.bsc-adm-bar,.bsc-adm-edit,.bsc-adm-pay,.bsc-adm-acc .ctl,.bsc-adm-state .obtn,.wa-note{display:none!important}
+  .bsc-adm-accounts{grid-template-columns:1fr 1fr}
+  .bsc-adm-acc{break-inside:avoid}
+}
