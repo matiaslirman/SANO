@@ -674,3 +674,7 @@ button,a.tile,.wk-day,.mkt-chip,.addstep button{touch-action:manipulation}
   .hb-extra{display:none}
   .hstrip{padding-bottom:40px}
 }
+
+/* Enlace al evento temporal (solo aparece dentro de su ventana de pedidos) */
+.nav a.nav-bsc{background:#003BFF;color:#ECEBE6;font-weight:700;letter-spacing:.03em}
+.nav a.nav-bsc:hover{background:#2a5cff;color:#fff}

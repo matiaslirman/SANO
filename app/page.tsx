@@ -12,7 +12,7 @@ export default async function Home() {
 
   return (
     <>
-      <SiteHeader viaje={status.viaje?.estado === "abierto"} />
+      <SiteHeader viaje={status.viaje?.estado === "abierto"} bsc={!!status.bsc} />
       <main>
         <Ordering initialStatus={status} initialMarket={market} />
       </main>
