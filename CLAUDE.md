@@ -82,8 +82,38 @@ packs son solo platos fuertes (lasañas, pechugas rellenas, arroz chaufa); prote
   "Activo", packs y premios. API: `/api/viaje/orders` (POST público si está abierto; GET admin), `/api/viaje/settings` (admin).
 - **Pendientes del dueño** (no inventar): vida útil refrigerada de las bandejas, alérgenos/ingredientes, horario de retiro de Viaje Sano
   (hoy se asume 8 a. m.–12 md).
+### Bistro Social Club (`/bistro-social-club`) — evento temporal con carta, promo y comanda
+Noche **fuera de horario** en 22Bistro (jueves 19 de nov de 2026, desde las 7:30 p. m.). Es una sección aparte con **su propio look** (solo
+esa pestaña): azul `#003BFF` + papel `#ECEBE6` + tinta `#1A1A1A`, **IBM Plex Mono autoalojada** (`public/bsc/fonts`, sin pedir nada a Google),
+grano de papel, cruces de corte, encabezados `[ENTRE CORCHETES]`, tarjetas con foto y etiqueta superpuesta, sin degradados ni emojis, ticket de
+confirmación con muescas ("ADMITE 1"). Estilos en `app/bistro-social-club/bsc.css` (todo bajo `.bsc`). **El logo son solo los archivos del
+cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto con otra tipografía para hacer de logo. El resto del sitio no cambia.
+- **Ventana** (`BscSettings.availableFrom/availableUntil`, hora CR, editable en el panel): se ve y recibe pedidos desde el **jueves 19/11 00:00**
+  hasta el **viernes 20/11 08:00**. Antes de abrir → **404** (y no hay enlace); después → "ya terminó"; el enlace "Bistro Social Club" del encabezado
+  de la portada **solo aparece dentro de la ventana** (`PublicStatus.bsc`). **El servidor es la autoridad**: `POST /api/bsc/orders` responde 409
+  fuera de la ventana o con el interruptor apagado (`bscOpen`). El dueño con sesión ve la página siempre (vista previa) y puede probar pedidos.
+- **Carta** (`DEFAULT_BSC` en `lib/defaults.ts`; guardada como `sano:bsc`): tragos ₡5.000 (Gin Tonic y Paloma con variante **obligatoria**), cerveza ₡2.000,
+  vino (2 variantes: ₡3.500 / ₡4.000, **nombres pendientes**: hoy "Opción ₡3.500/₡4.000"), 5 platos para picar ₡3.000. Precios y variantes salen
+  de la carta, nunca del cliente.
+- **Promo** (`applyPromo` en `lib/bsc.ts`): "primer plato para picar incluido con tu primer trago" — **por persona, una sola vez**: con ≥1 trago
+  de la casa (`promoTrigger`) en la cuenta, el **primer** plato para picar (`promoEligible`) que pidió esa persona sale a ₡0, sin importar el
+  orden ni cuántos pedidos use. **Cerveza y vino no la activan.** Es de la **cuenta**, no del pedido.
+- **Cuenta por persona** (`accountKey`/`buildAccounts`): mismo teléfono (últimos 8 dígitos) = misma persona; sin teléfono, mismo nombre exacto
+  (sin tildes ni mayúsculas). El celular recuerda nombre/teléfono/mesa (`sano:bsc:contact`) para que sus pedidos caigan en la misma cuenta.
+  Cuenta pagada = todos sus pedidos pagados; un pedido nuevo la reabre sola.
+- **Pedidos**: `kind: "bsc"`, `bsc` (líneas con precio del momento), `bscTable`, `bscPrep` (`recibido → preparando → entregado`), `windowId: "bsc"`;
+  comparten la numeración `SANO-<n>`. **Aislamiento**: `store.listOrders()` los **excluye** (no tocan cupos, Pedidos, cocina, etiquetas, insights ni
+  ranking); `store.listBscOrders()` es opt-in. **No suman al ingreso mensual de Analítica** (decisión pendiente del dueño).
+- **Comanda del staff** (`/admin/bsc`, pestaña "Bistro Social Club" mientras el interruptor esté encendido; `components/admin/BscView.tsx`): cuentas por
+  persona (ítems con variante, subtotal, promo, total), estado de cada pedido (un toque avanza), "Cuenta pagada/Reabrir", totales del evento,
+  **"Qué preparar ahora"** por ítem, filtros (pendientes de preparar, cuentas abiertas), **CSV** e **imprimir**, letra grande y botones de 44 px,
+  se actualiza sola cada 8 s. Protegida por la sesión del panel. Debajo, **Configuración del evento** (`BscEditor.tsx`): interruptor, ventana,
+  precios, nombres de variantes y qué ítems activan/reciben la promo. La comanda sigue accesible después de la ventana.
+- API: `/api/bsc/orders` (POST público en ventana; GET staff), `/api/bsc/settings` (staff), `/api/bsc/accounts` (staff: cerrar/reabrir cuenta).
+- **Pendientes del dueño** (confirmar, no inventar): qué distingue los dos vinos, si cerveza/vino deben activar la promo, derechos de uso públicos de
+  las fotos (algunas las aportó el cliente), cómo se cobra la cuenta (la página no dice nada al respecto), y los logos en SVG (los PNG son de baja resolución).
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
-- `app/admin/*` — panel: **Pedidos · Viaje Sano · Resumen cocina · Etiquetas · Analítica · Contenido**
+- `app/admin/*` — panel: **Pedidos · Viaje Sano · Bistro Social Club (temporal) · Resumen cocina · Etiquetas · Analítica · Contenido**
   (pestañas en `components/admin/AdminShell.tsx`).
 - `lib/store.ts` — **toda la persistencia**. Upstash Redis KV si hay credenciales (`kvEnv()`);
   si no, fallback a `.data/db.json` (efímero en Vercel).
@@ -161,7 +191,7 @@ todo el tiempo o un mes con pedidos) que escopa todas las métricas. Tests: `scr
   (tildes, mayúsculas, ~2 letras en nombres largos; "Ana" ≠ "Ana María"). Eventos no cuentan. Alimenta el insight de
   clientes que repiten.
 - Tests: `node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-<x>.mts`
-  (`windows`, `months`, `dishes`, `insights`, `hero`, `customers`, `favorites`, `viaje`, `weekly`).
+  (`windows`, `months`, `dishes`, `insights`, `hero`, `customers`, `favorites`, `viaje`, `weekly`, `bsc`).
 
 ## Desarrollo
 ```bash

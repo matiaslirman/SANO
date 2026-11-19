@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Wordmark } from "@/lib/brand";
 import { LogoutButton } from "./LogoutButton";
+import { store } from "@/lib/store";
 
-type Tab = "pedidos" | "viaje" | "cocina" | "etiquetas" | "analitica" | "contenido";
+type Tab = "pedidos" | "viaje" | "bsc" | "cocina" | "etiquetas" | "analitica" | "contenido";
 
-export function AdminShell({
+export async function AdminShell({
   active,
   title,
   children,
@@ -13,9 +14,12 @@ export function AdminShell({
   title: string;
   children: React.ReactNode;
 }) {
+  // La pestaña del evento temporal solo se ve mientras el interruptor está encendido (la comanda sigue en /admin/bsc).
+  const bscOn = (await store.getBsc()).enabled || active === "bsc";
   const tabs: { id: Tab; label: string; href: string }[] = [
     { id: "pedidos", label: "Pedidos", href: "/admin/pedidos" },
     { id: "viaje", label: "Viaje Sano", href: "/admin/viaje" },
+    ...(bscOn ? [{ id: "bsc" as Tab, label: "Bistro Social Club", href: "/admin/bsc" }] : []),
     { id: "cocina", label: "Resumen cocina", href: "/admin/cocina" },
     { id: "etiquetas", label: "Etiquetas", href: "/admin/etiquetas" },
     { id: "analitica", label: "Analítica", href: "/admin/analitica" },
