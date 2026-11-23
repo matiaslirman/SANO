@@ -28,7 +28,9 @@ export async function POST(req: Request) {
   const check = checkBscOrder(body, settings, new Date(), { ignoreWindow: admin });
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.code === "closed" ? 409 : 400 });
 
-  const order = await store.createBscOrder(check);
+  // «staff» solo lo puede marcar quien tiene sesión del panel (así se distingue lo que cargó el equipo de lo que pidió el cliente)
+  const by = admin && body.staff === true ? "staff" : "cliente";
+  const order = await store.createBscOrder(check, { edition: settings.editionId, by });
 
   // Resumen de la cuenta de ESA persona (mismo teléfono o nombre): solo montos, sin líneas ni datos de otras personas.
   const key = accountKey(order);
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
     : undefined;
 
   return NextResponse.json(
-    { order: { id: order.id, createdAt: order.createdAt, customerName: order.customerName, bsc: order.bsc, total: order.total, bscTable: order.bscTable }, account },
+    { order: { id: order.id, createdAt: order.createdAt, bscEdition: order.bscEdition, customerName: order.customerName, bsc: order.bsc, total: order.total, bscTable: order.bscTable }, account },
     { status: 201 }
   );
 }

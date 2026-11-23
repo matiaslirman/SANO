@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   bscState, bscOpen, crLocalToIso, isoToCrLocal, crDateTimeLabel, crTime, checkBscOrder, applyPromo, accountKey,
   buildAccounts, eventTotals, accountsCsv, normalizeBsc, priceLabel,
+  crDate, orderEdition, editionLabel, nextEditionPatch, slugId, moveItem, salesByHour, editionsSummary, LEGACY_EDITION,
 } from "../lib/bsc.ts";
 import { DEFAULT_BSC } from "../lib/defaults.ts";
 import type { Order, OrderBscLine } from "../lib/types.ts";
@@ -192,5 +193,131 @@ const dup = normalizeBsc({ items: [
 assert.equal(dup.items.length, 1);
 assert.equal(dup.items[0].image, undefined); // rutas de imagen raras se descartan
 assert.equal(normalizeBsc({ items: [] }, S).items.length, S.items.length); // sin ítems válidos → carta por defecto
+
+// ═══ Segunda edición, carta editable y tracking de ventas ═══════════════════════════════════
+
+// ── Ediciones ──
+assert.equal(crDate("2026-11-20T01:00:00Z"), "2026-11-19"); // 7 p. m. del jueves en CR sigue siendo jueves
+assert.equal(crDate("2026-11-20T06:00:00Z"), "2026-11-20");
+assert.equal(crDate("basura"), "");
+assert.equal(LEGACY_EDITION, "2026-11-19");
+assert.equal(orderEdition({}), "2026-11-19"); // los pedidos de la primera edición no traían edición
+assert.equal(orderEdition({ bscEdition: "2026-11-26" }), "2026-11-26");
+assert.equal(editionLabel("2026-11-26"), "Jueves 26 nov");
+assert.equal(editionLabel("basura"), "basura");
+assert.equal(S.editionId, "2026-11-19");
+assert.equal(normalizeBsc({ startsAt: "2026-11-26T19:30:00-06:00", availableFrom: "2026-11-26T00:00:00-06:00", availableUntil: "2026-11-27T08:00:00-06:00" }, S).editionId, "2026-11-26"); // sin edición guardada: sale del evento
+assert.equal(normalizeBsc({ editionId: "2026-12-03" }, S).editionId, "2026-12-03");
+assert.equal(normalizeBsc({ editionId: "cualquier cosa" }, S).editionId, "2026-11-19");
+const next = nextEditionPatch(S);
+assert.deepEqual(next, {
+  editionId: "2026-11-26",
+  startsAt: "2026-11-26T19:30:00-06:00",
+  availableFrom: "2026-11-26T00:00:00-06:00",
+  availableUntil: "2026-11-27T08:00:00-06:00",
+});
+assert.equal(nextEditionPatch(next).editionId, "2026-12-03");
+assert.ok(bscOpen(new Date("2026-11-26T20:00:00Z"), { ...S, ...next })); // abierto el jueves 26
+assert.ok(!bscOpen(new Date("2026-11-27T14:00:00Z"), { ...S, ...next })); // cerrado el viernes 27 a las 08:00 CR
+
+// ── Carta: ids y orden ──
+assert.equal(slugId("Mojito de maracuyá", []), "mojito-de-maracuya");
+assert.equal(slugId("Cerveza", ["cerveza"]), "cerveza-2");
+assert.equal(slugId("Cerveza", ["cerveza", "cerveza-2"]), "cerveza-3");
+assert.equal(slugId("¡¡¡", []), "item");
+assert.ok(slugId("Un nombre larguísimo para un trago que no termina nunca jamás", []).length <= 24);
+const ids = (items: typeof S.items) => items.map((i) => i.id);
+const up = moveItem(S.items, "paloma", -1);
+assert.deepEqual(ids(up).slice(0, 3), ["paloma", "gin-tonic", "playero"]);
+assert.deepEqual(ids(moveItem(S.items, "gin-tonic", -1)), ids(S.items)); // ya es el primero de su categoría: no cruza a otra
+assert.deepEqual(ids(moveItem(S.items, "playero", 1)), ids(S.items)); // el último de tragos no se mueve a bebidas
+assert.equal(ids(moveItem(S.items, "cerveza", -1))[3], "cerveza"); // no sube a «tragos»
+assert.equal(moveItem(S.items, "no-existe", 1), S.items);
+const added = normalizeBsc({ items: [...S.items, { id: "mojito", cat: "tragos", name: "Mojito", price: 5500, promoTrigger: true, active: true, variants: [{ id: "clasico", name: "Clásico" }, { id: "fresa", name: "Fresa", price: 6000 }] }] }, S);
+const mojito = added.items.find((i) => i.id === "mojito")!;
+assert.equal(mojito.variants?.length, 2);
+assert.equal(unitPriceOf(mojito, "fresa"), 6000);
+assert.equal(unitPriceOf(mojito, "clasico"), 5500);
+function unitPriceOf(item: (typeof S.items)[number], vid: string) {
+  const c = checkBscOrder({ customerName: "A", lines: [{ id: item.id, variantId: vid, qty: 1 }] }, added, NOW);
+  assert.ok(c.ok);
+  return c.ok ? c.lines[0].unitPrice : 0;
+}
+assert.ok(checkBscOrder({ customerName: "A", lines: [{ id: "mojito", variantId: "fresa", qty: 1 }] }, added, NOW).ok); // un ítem nuevo ya se puede pedir
+const removed = normalizeBsc({ items: S.items.filter((i) => i.id !== "fondue") }, S);
+assert.ok(!checkBscOrder({ customerName: "A", lines: [{ id: "fondue", qty: 1 }] }, removed, NOW).ok); // y uno quitado ya no
+assert.equal(removed.items.length, S.items.length - 1);
+
+// ── Cobro por método y tracking ──
+const PAY = (o: Order, pay: "efectivo" | "sinpe" | "tarjeta", at: string): Order => ({ ...o, status: "pagado", bscPay: pay, bscPaidAt: at });
+const e1 = O("Uno", "7111 0001", T0, [trago(2), plato()], "pendiente", "entregado"); // 10.000 + 3.000, promo −3.000 → 10.000
+const e2 = O("Dos", "7111 0002", T1, [cerveza(3), vino()], "pendiente", "preparando"); // 6.000 + 3.500 = 9.500
+const e3 = O("Tres", "7111 0003", T2, [playero(1)], "pendiente", "recibido"); // 5.000
+const e4 = O("Cuatro", "7111 0004", T2, [cerveza(1)], "pendiente", "entregado"); // 2.000
+const orders2 = [
+  PAY(e1, "efectivo", "2026-11-20T02:00:00Z"),
+  PAY(e2, "sinpe", "2026-11-20T02:10:00Z"),
+  e3,
+  { ...e4, status: "pagado" as const }, // cobrada sin método
+];
+const acc2 = buildAccounts(orders2);
+const tot2 = eventTotals(acc2);
+assert.equal(tot2.ventas, 10000 + 9500 + 5000 + 2000);
+assert.equal(tot2.bruto, 13000 + 9500 + 5000 + 2000);
+assert.equal(tot2.bruto - tot2.promoMonto, tot2.ventas); // lo vendido cuadra con lo facturado
+assert.equal(tot2.cobrado, 10000 + 9500 + 2000);
+assert.equal(tot2.porCobrar, 5000);
+assert.equal(tot2.cobrado + tot2.porCobrar, tot2.ventas);
+assert.deepEqual(tot2.porMetodo, { efectivo: 10000, sinpe: 9500, tarjeta: 0, sin: 2000 });
+assert.equal(Object.values(tot2.porMetodo).reduce((a, b) => a + b, 0), tot2.cobrado); // los métodos suman lo cobrado
+const uno = acc2.find((a) => a.name === "Uno")!;
+assert.deepEqual([uno.pay, uno.paidAt], ["efectivo", "2026-11-20T02:00:00Z"]);
+assert.equal(acc2.find((a) => a.name === "Tres")!.pay, undefined);
+// por ítem: lo pedido, lo que salió, lo que falta y lo facturado
+const tr = tot2.items.find((i) => i.name === "Gin Tonic")!;
+assert.deepEqual([tr.qty, tr.delivered, tr.pending, tr.revenue], [2, 2, 0, 10000]);
+const cz = tot2.items.find((i) => i.name === "Cerveza")!;
+assert.deepEqual([cz.qty, cz.delivered, cz.pending, cz.revenue], [4, 1, 3, 8000]); // 3 del pedido «preparando», 1 entregada
+assert.equal(tot2.items.reduce((t, i) => t + i.revenue, 0), tot2.bruto); // los ingresos por ítem suman el bruto
+assert.ok(tot2.items.every((i) => i.qty === i.delivered + i.pending));
+// reabrir una cuenta pierde método y hora
+const reopened = buildAccounts([PAY(e1, "efectivo", "2026-11-20T02:00:00Z"), { ...e1, id: "SANO-999", seq: 999, createdAt: T2, status: "pendiente" }]);
+assert.equal(reopened[0].paid, false);
+assert.equal(reopened[0].pay, undefined);
+
+// ── Ventas por hora (la noche cruza la medianoche) ──
+const h1 = O("H", "", "2026-11-20T01:30:00Z", [cerveza(1)]); // 7:30 p. m. CR
+const h2 = O("H", "", "2026-11-20T01:50:00Z", [cerveza(2)]); // 7:50 p. m. CR
+const h3 = O("H", "", "2026-11-20T03:10:00Z", [cerveza(1)]); // 9:10 p. m. CR
+const h4 = O("H", "", "2026-11-20T06:15:00Z", [cerveza(5)]); // 12:15 a. m. CR (ya viernes)
+const hours = salesByHour([h1, h2, h3, h4, { ...h1, kind: undefined } as Order]);
+assert.deepEqual(hours.map((h) => h.label), ["7 p. m.", "8 p. m.", "9 p. m.", "10 p. m.", "11 p. m.", "12 a. m."]);
+assert.deepEqual(hours.map((h) => h.orders), [2, 0, 1, 0, 0, 1]);
+assert.equal(hours[0].bruto, 2000 + 4000);
+assert.equal(hours.reduce((t, h) => t + h.bruto, 0), h1.total + h2.total + h3.total + h4.total);
+assert.deepEqual(salesByHour([]), []);
+
+// ── Resumen por edición ──
+const ed2a = { ...O("Jueves2", "7222 0001", T1, [trago(1), plato()]), bscEdition: "2026-11-26" } as Order;
+const sum = editionsSummary([...orders2, ed2a]);
+assert.deepEqual(sum.map((e) => e.id), ["2026-11-26", "2026-11-19"]); // más reciente primero
+assert.equal(sum[0].ventas, 5000); // trago + plato incluido por promo
+assert.equal(sum[0].promoMonto, 3000);
+assert.equal(sum[1].ventas, tot2.ventas);
+assert.equal(sum[1].pedidos, 4);
+// una edición no se mezcla con la otra en las cuentas
+const same = [{ ...O("Ana", "7333 0001", T0, [cerveza()]), bscEdition: "2026-11-19" } as Order, { ...O("Ana", "7333 0001", T1, [cerveza()]), bscEdition: "2026-11-26" } as Order];
+assert.equal(buildAccounts(same.filter((o) => orderEdition(o) === "2026-11-26")).length, 1);
+assert.equal(buildAccounts(same.filter((o) => orderEdition(o) === "2026-11-26"))[0].orders.length, 1);
+
+// ── CSV con origen y cobro ──
+const csv2 = accountsCsv(acc2);
+const head = csv2.replace("\uFEFF", "").split("\r\n")[0].split(";");
+assert.deepEqual(head.slice(5, 6).concat(head.slice(13)), ["Origen", "Método de pago", "Cobrada a las"]);
+assert.ok(csv2.includes("Efectivo") && csv2.includes("SINPE Móvil"));
+assert.ok(accountsCsv(buildAccounts([{ ...e1, bscBy: "staff" } as Order])).includes(";Staff;"));
+assert.ok(accountsCsv(buildAccounts([e1])).includes(";Cliente;"));
+
+console.log("bsc (ediciones y tracking): todos los tests OK");
 
 console.log("bsc: todos los tests OK");

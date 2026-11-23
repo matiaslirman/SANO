@@ -212,6 +212,7 @@ export const DEFAULT_BSC: BscSettings = {
   slug: "bistro-social-club",
   name: "Bistro Social Club",
   venue: "22Bistro · Ciudad Colón",
+  editionId: "2026-11-19",
   startsAt: "2026-11-19T19:30:00-06:00",
   availableFrom: "2026-11-19T00:00:00-06:00",
   availableUntil: "2026-11-20T08:00:00-06:00",

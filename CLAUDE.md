@@ -101,15 +101,27 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
 - **Cuenta por persona** (`accountKey`/`buildAccounts`): mismo teléfono (últimos 8 dígitos) = misma persona; sin teléfono, mismo nombre exacto
   (sin tildes ni mayúsculas). El celular recuerda nombre/teléfono/mesa (`sano:bsc:contact`) para que sus pedidos caigan en la misma cuenta.
   Cuenta pagada = todos sus pedidos pagados; un pedido nuevo la reabre sola.
-- **Pedidos**: `kind: "bsc"`, `bsc` (líneas con precio del momento), `bscTable`, `bscPrep` (`recibido → preparando → entregado`), `windowId: "bsc"`;
+- **Pedidos**: `kind: "bsc"`, `bsc` (líneas con precio del momento), `bscTable`, `bscPrep` (`recibido → preparando → entregado`), `bscEdition`, `bscBy` (`cliente` | `staff`;
+  `staff` solo lo puede marcar quien tiene sesión del panel), `bscPay` (`efectivo` | `sinpe` | `tarjeta`) y `bscPaidAt`, `windowId: "bsc"`;
   comparten la numeración `SANO-<n>`. **Aislamiento**: `store.listOrders()` los **excluye** (no tocan cupos, Pedidos, cocina, etiquetas, insights ni
   ranking); `store.listBscOrders()` es opt-in. **No suman al ingreso mensual de Analítica** (decisión pendiente del dueño).
-- **Comanda del staff** (`/admin/bsc`, pestaña "Bistro Social Club" mientras el interruptor esté encendido; `components/admin/BscView.tsx`): cuentas por
-  persona (ítems con variante, subtotal, promo, total), estado de cada pedido (un toque avanza), "Cuenta pagada/Reabrir", totales del evento,
-  **"Qué preparar ahora"** por ítem, filtros (pendientes de preparar, cuentas abiertas), **CSV** e **imprimir**, letra grande y botones de 44 px,
-  se actualiza sola cada 8 s. Protegida por la sesión del panel. Debajo, **Configuración del evento** (`BscEditor.tsx`): interruptor, ventana,
-  precios, nombres de variantes y qué ítems activan/reciben la promo. La comanda sigue accesible después de la ventana.
-- API: `/api/bsc/orders` (POST público en ventana; GET staff), `/api/bsc/settings` (staff), `/api/bsc/accounts` (staff: cerrar/reabrir cuenta).
+- **Ediciones** (`BscSettings.editionId` = fecha CR del evento, p. ej. `2026-11-26`): cada jueves tiene su comanda y sus totales. Los pedidos llevan
+  `bscEdition`; **los de la primera edición (19/11) no lo traen y cuentan como `2026-11-19`** (`LEGACY_EDITION`, `orderEdition`). El `editionId` solo
+  cambia con el botón **"Empezar la próxima edición (+7 días)"** (mueve evento y ventana una semana, mismas horas; `nextEditionPatch`), no al editar
+  fechas. La edición anterior queda consultable en el selector "Edición" y en la tabla de ediciones de Ventas.
+- **Plataforma del staff** (`/admin/bsc`, pestaña "Bistro Social Club" mientras el interruptor esté encendido; `BscView.tsx` con tres vistas):
+  - **Comanda** (`BscComanda.tsx`): **Disponibilidad** (un toque marca un ítem *agotado*; desaparece al instante de la página de los clientes),
+    **Nueva comanda** (`BscCaptura.tsx`: el equipo carga lo que pide cada persona; mismo servidor, mismos precios y misma promo, calculada sobre la
+    cuenta completa; "+ Pedido" en una cuenta la precarga), **Qué preparar ahora**, cuentas por persona con estado de cada pedido (un toque avanza),
+    **Cobrar cuenta** (pide el método: efectivo, SINPE o tarjeta; guarda método y hora) / Reabrir, filtros, CSV e imprimir.
+  - **Ventas** (`BscVentas.tsx`): **Facturado** (= suma de totales de las cuentas, ya con promos), Cobrado, Por cobrar, ticket promedio, **cobrado por método**
+    (para cuadrar la caja), tabla **"Lo vendido y lo que salió"** por ítem (pedidos / salió = entregado / falta / ingreso) que **cuadra siempre**:
+    bruto − promos = facturado, y los métodos suman lo cobrado; ventas por hora (hora CR, cruza la medianoche); resumen por edición; CSV.
+  - **Carta y edición** (`BscEditor.tsx`): **agregar, quitar y ordenar platos y bebidas** (categorías fijas: tragos, cerveza y vino, para picar), precios,
+    variantes (con precio propio o el base), foto (de `public/bsc/fotos`), qué ítems activan o reciben la promo; fechas y ventana; nueva edición.
+    Los ítems nuevos estrenan un id legible a partir del nombre; un ítem quitado no afecta los pedidos ya hechos (guardan su propia copia de la línea).
+  Protegida por la sesión del panel; botones de 44 px; se actualiza sola cada 8 s. La comanda sigue accesible después de la ventana.
+- API: `/api/bsc/orders` (POST público en ventana, o del staff con `staff: true`; GET staff), `/api/bsc/settings` (staff), `/api/bsc/accounts` (staff: cobrar con método / reabrir).
 - **Pendientes del dueño** (confirmar, no inventar): qué distingue los dos vinos, si cerveza/vino deben activar la promo, derechos de uso públicos de
   las fotos (algunas las aportó el cliente), cómo se cobra la cuenta (la página no dice nada al respecto), y los logos en SVG (los PNG son de baja resolución).
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).

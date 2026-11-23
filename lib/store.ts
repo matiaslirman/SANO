@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { Redis } from "@upstash/redis";
-import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus, ViajeSettings, BscSettings, BscPrep } from "./types";
+import type { Settings, MarketCategory, Order, OrderDishLine, OrderStatus, EventSettings, PublicStatus, ViajeSettings, BscSettings, BscPrep, BscPay } from "./types";
 import { DEFAULT_SETTINGS, DEFAULT_MARKET, DEFAULT_EVENT, DEFAULT_VIAJE, DEFAULT_BSC } from "./defaults";
 import { getNextWindow, getClientWindows, windowFromId, ORDERS_PAUSED_TITLE, ORDERS_PAUSED_MESSAGE } from "./windows";
 import { priceForDishes, resolveExtraPrices } from "./pricing";
@@ -306,7 +306,7 @@ export const store = {
   },
 
   /** Crea un pedido del evento ya validado (ver `checkBscOrder`). Comparte la numeración SANO-<n>. */
-  async createBscOrder(c: Extract<BscOrderCheck, { ok: true }>): Promise<Order> {
+  async createBscOrder(c: Extract<BscOrderCheck, { ok: true }>, meta: { edition: string; by: "cliente" | "staff" }): Promise<Order> {
     const seq = await this.nextSeq();
     const id = `SANO-${seq}`;
     const order: Order = {
@@ -329,6 +329,8 @@ export const store = {
       kind: "bsc",
       bsc: c.lines,
       bscPrep: "recibido",
+      bscEdition: meta.edition,
+      bscBy: meta.by,
       ...(c.table ? { bscTable: c.table } : {}),
     };
     if (isPersistent()) {
@@ -512,7 +514,7 @@ export const store = {
 
   async updateOrder(
     id: string,
-    patch: { status?: OrderStatus; completed?: boolean; pickupDate?: string; pickupConfirmed?: boolean; bscPrep?: BscPrep }
+    patch: { status?: OrderStatus; completed?: boolean; pickupDate?: string; pickupConfirmed?: boolean; bscPrep?: BscPrep; bscPay?: BscPay | null; bscPaidAt?: string | null }
   ): Promise<Order | null> {
     const order = await this.getOrder(id);
     if (!order) return null;
@@ -520,6 +522,13 @@ export const store = {
     if (typeof patch.completed === "boolean") order.completed = patch.completed;
     if (order.kind === "bsc" && (patch.bscPrep === "recibido" || patch.bscPrep === "preparando" || patch.bscPrep === "entregado")) {
       order.bscPrep = patch.bscPrep;
+    }
+    if (order.kind === "bsc") {
+      // cobro: método y hora; al reabrir la cuenta (null) se borran
+      if (patch.bscPay === null) delete order.bscPay;
+      else if (patch.bscPay === "efectivo" || patch.bscPay === "sinpe" || patch.bscPay === "tarjeta") order.bscPay = patch.bscPay;
+      if (patch.bscPaidAt === null) delete order.bscPaidAt;
+      else if (typeof patch.bscPaidAt === "string" && Number.isFinite(Date.parse(patch.bscPaidAt))) order.bscPaidAt = patch.bscPaidAt;
     }
     if (order.kind === "viaje") {
       if (isRealDate(patch.pickupDate)) {
