@@ -111,6 +111,10 @@ export interface Order {
   bsc?: OrderBscLine[];      // bsc: tragos, bebidas y platos para picar, con el precio de ese momento
   bscTable?: string;         // bsc: mesa o referencia que dejó la persona (opcional)
   bscPrep?: BscPrep;         // bsc: estado de preparación (barra / cocina)
+  bscEdition?: string;       // bsc: edición del evento (fecha CR del evento, AAAA-MM-DD); sin dato = primera edición
+  bscBy?: "cliente" | "staff"; // bsc: quién lo cargó (el cliente desde su celular o el staff desde el panel)
+  bscPay?: BscPay;           // bsc: método con el que se cobró la cuenta
+  bscPaidAt?: string;        // bsc: cuándo se cobró (ISO)
 }
 
 export interface WindowInfo {
@@ -197,6 +201,8 @@ export interface OrderViajeLine {
 // ── Bistro Social Club (evento temporal con carta, promo y comanda) ──────────
 
 export type BscPrep = "recibido" | "preparando" | "entregado";
+/** Cómo se cobró una cuenta (para cuadrar la caja al cierre). */
+export type BscPay = "efectivo" | "sinpe" | "tarjeta";
 export type BscCatId = "tragos" | "bebidas" | "picar";
 
 export interface BscVariant {
@@ -228,6 +234,8 @@ export interface BscSettings {
   slug: string;
   name: string;
   venue: string;
+  /** Edición en curso (AAAA-MM-DD, fecha CR del evento). Separa comanda y totales de cada jueves; cambia con «Nueva edición». */
+  editionId: string;
   startsAt: string;       // inicio del evento (ISO con zona), solo para mostrar
   availableFrom: string;  // desde cuándo se ve y acepta pedidos (ISO)
   availableUntil: string; // hasta cuándo (ISO)

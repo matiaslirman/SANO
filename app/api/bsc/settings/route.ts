@@ -24,6 +24,7 @@ export async function PATCH(req: Request) {
   if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
   if (typeof body.name === "string") patch.name = body.name;
   if (typeof body.venue === "string") patch.venue = body.venue;
+  if (typeof body.editionId === "string") patch.editionId = body.editionId;
   if (typeof body.startsAt === "string") patch.startsAt = body.startsAt;
   if (typeof body.availableFrom === "string") patch.availableFrom = body.availableFrom;
   if (typeof body.availableUntil === "string") patch.availableUntil = body.availableUntil;

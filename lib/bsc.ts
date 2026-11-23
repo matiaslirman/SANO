@@ -3,7 +3,7 @@
  * promo por persona, cuentas de la comanda y exportación. Todo en hora de Costa Rica (UTC−6, sin horario de verano).
  * El servidor es la autoridad: del cliente solo se leen ids, variantes y cantidades; el precio sale de la carta.
  */
-import type { BscCatId, BscItem, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
+import type { BscCatId, BscItem, BscPay, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
 import { crc } from "./format";
 
 export const BSC_CATS: { id: BscCatId; name: string; sub?: string }[] = [
@@ -16,6 +16,12 @@ const isCat = (v: unknown): v is BscCatId => v === "tragos" || v === "bebidas" |
 
 export const MAX_QTY_PER_LINE = 20;
 export const MAX_LINES = 30;
+export const PAY_METHODS: BscPay[] = ["efectivo", "sinpe", "tarjeta"];
+export const PAY_LABEL: Record<BscPay | "sin", string> = { efectivo: "Efectivo", sinpe: "SINPE Móvil", tarjeta: "Tarjeta", sin: "Sin método" };
+/** Fotos disponibles en /public/bsc/fotos para asignar a un ítem desde el panel. */
+export const BSC_PHOTOS = ["gintonic.jpg", "paloma.jpg", "playero.jpg", "papitas.jpg", "fondue.jpg", "guacamole.jpg", "platito.jpg", "hummus.jpg"];
+/** Los pedidos de la primera edición (19/11/2026) se guardaron sin edición: se les asigna esta. */
+export const LEGACY_EDITION = "2026-11-19";
 export const PREP_FLOW: BscPrep[] = ["recibido", "preparando", "entregado"];
 export const PREP_LABEL: Record<BscPrep, string> = { recibido: "Recibido", preparando: "En preparación", entregado: "Entregado" };
 
@@ -80,6 +86,62 @@ export function crTime(iso: string): string {
   const h24 = d.getUTCHours();
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${String(d.getUTCMinutes()).padStart(2, "0")} ${h24 < 12 ? "a. m." : "p. m."}`;
+}
+
+// ── Ediciones (cada jueves es una edición con su comanda y sus totales) ──────
+
+/** «2026-11-19» a partir de un instante, en hora de Costa Rica. */
+export function crDate(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? new Date(t - 6 * 3600_000).toISOString().slice(0, 10) : "";
+}
+
+export const orderEdition = (o: Pick<Order, "bscEdition">): string => o.bscEdition || LEGACY_EDITION;
+
+/** «Jueves 19 nov» para el selector de ediciones. */
+export function editionLabel(id: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id || "");
+  if (!m) return id || "";
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  const wd = WEEKDAYS_LONG[d.getUTCDay()];
+  return `${wd.charAt(0).toUpperCase()}${wd.slice(1)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+const shiftIso = (iso: string, days: number): string => {
+  const local = isoToCrLocal(new Date(Date.parse(iso) + days * 86_400_000).toISOString());
+  return crLocalToIso(local);
+};
+
+/**
+ * Datos para arrancar la próxima edición: mueve el evento y la ventana `days` días (por defecto una semana, mismas horas)
+ * y estrena un `editionId` nuevo. La comanda de la edición anterior queda intacta y consultable.
+ */
+export function nextEditionPatch(s: Pick<BscSettings, "startsAt" | "availableFrom" | "availableUntil">, days = 7): Pick<BscSettings, "editionId" | "startsAt" | "availableFrom" | "availableUntil"> {
+  const startsAt = shiftIso(s.startsAt, days);
+  return { editionId: crDate(startsAt), startsAt, availableFrom: shiftIso(s.availableFrom, days), availableUntil: shiftIso(s.availableUntil, days) };
+}
+
+/** Id estable a partir de un nombre («Mojito de maracuyá» → «mojito-de-maracuya»), sin repetir los ya usados. */
+export function slugId(name: string, taken: Iterable<string>): string {
+  const used = new Set(taken);
+  const base = (name || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "item";
+  let id = base;
+  for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+/** Sube o baja un ítem dentro de su categoría (el orden de la carta es el del arreglo). */
+export function moveItem(items: BscItem[], id: string, dir: -1 | 1): BscItem[] {
+  const i = items.findIndex((x) => x.id === id);
+  if (i < 0) return items;
+  let j = i + dir;
+  while (j >= 0 && j < items.length && items[j].cat !== items[i].cat) j += dir;
+  if (j < 0 || j >= items.length) return items;
+  const out = [...items];
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
 }
 
 // ── Carta ────────────────────────────────────────────────────
@@ -225,6 +287,9 @@ export interface BscAccount {
   lastAt: string;
   /** Pedidos que todavía no se entregaron. */
   pendingPrep: number;
+  /** Cómo y cuándo se cobró (solo si la cuenta está pagada). */
+  pay?: BscPay;
+  paidAt?: string;
 }
 
 export const prepOf = (o: Pick<Order, "bscPrep">): BscPrep => o.bscPrep || "recibido";
@@ -243,6 +308,8 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
     const last = chrono[chrono.length - 1];
     const promo = applyPromo(chrono);
     const subtotal = chrono.reduce((t, o) => t + o.total, 0);
+    const paid = chrono.every((o) => o.status === "pagado");
+    const payer = paid ? [...chrono].reverse().find((o) => o.bscPay) : undefined;
     out.push({
       key,
       name: last.customerName,
@@ -252,9 +319,11 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
       subtotal,
       promo,
       total: subtotal - promo.amount,
-      paid: chrono.every((o) => o.status === "pagado"),
+      paid,
       lastAt: last.createdAt,
       pendingPrep: chrono.filter((o) => prepOf(o) !== "entregado").length,
+      ...(payer?.bscPay ? { pay: payer.bscPay } : {}),
+      ...(paid ? { paidAt: chrono.map((o) => o.bscPaidAt || "").sort().pop() || undefined } : {}),
     });
   }
   return out.sort((a, b) => Number(a.paid) - Number(b.paid) || b.lastAt.localeCompare(a.lastAt));
@@ -263,13 +332,18 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
 export interface BscTotals {
   cuentas: number;
   abiertas: number;
+  /** Facturado: suma de los totales de todas las cuentas (con la promo ya descontada), cobradas o no. */
   ventas: number;
+  /** Suma de las líneas pedidas antes de la promo: ventas + promoMonto = bruto. */
+  bruto: number;
   cobrado: number;
   porCobrar: number;
   promos: number;
   promoMonto: number;
-  /** Por ítem y variante: lo pedido y lo que todavía falta entregar (para barra y cocina). */
-  items: { key: string; cat: BscCatId; name: string; variantName?: string; qty: number; pending: number }[];
+  /** Lo cobrado, por método (las cuentas pagadas sin método van en «sin»). */
+  porMetodo: Record<BscPay | "sin", number>;
+  /** Por ítem y variante: lo pedido, lo que salió (entregado), lo que falta y lo facturado en bruto. */
+  items: { key: string; cat: BscCatId; name: string; variantName?: string; qty: number; delivered: number; pending: number; revenue: number }[];
 }
 
 export function eventTotals(accounts: BscAccount[]): BscTotals {
@@ -279,24 +353,70 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
       const pend = prepOf(o) !== "entregado";
       for (const l of o.bsc || []) {
         const key = `${l.id}:${l.variantId || ""}`;
-        const cur = items.get(key) || { key, cat: l.cat, name: l.name, variantName: l.variantName, qty: 0, pending: 0 };
+        const cur = items.get(key) || { key, cat: l.cat, name: l.name, variantName: l.variantName, qty: 0, delivered: 0, pending: 0, revenue: 0 };
         cur.qty += l.qty;
+        cur.revenue += l.subtotal;
         if (pend) cur.pending += l.qty;
+        else cur.delivered += l.qty;
         items.set(key, cur);
       }
     }
   }
   const sum = (f: (a: BscAccount) => number, pick: (a: BscAccount) => boolean = () => true) => accounts.filter(pick).reduce((t, a) => t + f(a), 0);
+  const porMetodo: BscTotals["porMetodo"] = { efectivo: 0, sinpe: 0, tarjeta: 0, sin: 0 };
+  for (const a of accounts) if (a.paid) porMetodo[a.pay || "sin"] += a.total;
   return {
     cuentas: accounts.length,
     abiertas: accounts.filter((a) => !a.paid).length,
     ventas: sum((a) => a.total),
+    bruto: sum((a) => a.subtotal),
     cobrado: sum((a) => a.total, (a) => a.paid),
     porCobrar: sum((a) => a.total, (a) => !a.paid),
     promos: accounts.filter((a) => a.promo.applied).length,
     promoMonto: sum((a) => a.promo.amount),
+    porMetodo,
     items: [...items.values()].sort((a, b) => CAT_ORDER[a.cat] - CAT_ORDER[b.cat] || b.qty - a.qty || a.name.localeCompare(b.name)),
   };
+}
+
+/** Pedidos y facturación por hora (hora de Costa Rica), de la primera a la última hora con movimiento. */
+export function salesByHour(orders: Order[]): { hour: number; label: string; orders: number; bruto: number }[] {
+  const by = new Map<number, { orders: number; bruto: number }>();
+  for (const o of orders) {
+    if (o.kind !== "bsc") continue;
+    const t = Date.parse(o.createdAt);
+    if (!Number.isFinite(t)) continue;
+    const h = new Date(t - 6 * 3600_000).getUTCHours();
+    const cur = by.get(h) || { orders: 0, bruto: 0 };
+    cur.orders += 1;
+    cur.bruto += o.total;
+    by.set(h, cur);
+  }
+  if (by.size === 0) return [];
+  const hs = [...by.keys()];
+  // la noche cruza la medianoche: se ordena desde la hora más temprana «de la tarde» hacia la madrugada
+  const key = (h: number) => (h < 12 ? h + 24 : h);
+  const lo = Math.min(...hs.map(key));
+  const hi = Math.max(...hs.map(key));
+  const out = [];
+  for (let k = lo; k <= hi; k++) {
+    const h = k % 24;
+    const v = by.get(h) || { orders: 0, bruto: 0 };
+    out.push({ hour: h, label: `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "a. m." : "p. m."}`, ...v });
+  }
+  return out;
+}
+
+/** Resumen por edición (para comparar jueves entre sí). Más reciente primero. */
+export function editionsSummary(orders: Order[]): { id: string; label: string; pedidos: number; cuentas: number; ventas: number; cobrado: number; promoMonto: number }[] {
+  const ids = [...new Set(orders.filter((o) => o.kind === "bsc").map(orderEdition))];
+  return ids
+    .map((id) => {
+      const mine = orders.filter((o) => o.kind === "bsc" && orderEdition(o) === id);
+      const t = eventTotals(buildAccounts(mine));
+      return { id, label: editionLabel(id), pedidos: mine.length, cuentas: t.cuentas, ventas: t.ventas, cobrado: t.cobrado, promoMonto: t.promoMonto };
+    })
+    .sort((a, b) => b.id.localeCompare(a.id));
 }
 
 // ── Exportación (CSV para conciliar al cierre) ─────────────
@@ -309,16 +429,16 @@ const csvCell = (v: string | number) => {
 /** Una fila por línea de pedido + una fila de cierre por cuenta (promo y total). Con BOM para que Excel respete las tildes. */
 export function accountsCsv(accounts: BscAccount[]): string {
   const rows: (string | number)[][] = [
-    ["Cuenta", "Teléfono", "Mesa", "Pedido", "Hora", "Preparación", "Ítem", "Variante", "Cantidad", "Precio unitario", "Subtotal", "Estado de la cuenta"],
+    ["Cuenta", "Teléfono", "Mesa", "Pedido", "Hora", "Origen", "Preparación", "Ítem", "Variante", "Cantidad", "Precio unitario", "Subtotal", "Estado de la cuenta", "Método de pago", "Cobrada a las"],
   ];
   for (const a of accounts) {
     for (const o of a.orders) {
       for (const l of o.bsc || []) {
-        rows.push([a.name, a.whatsapp, a.table, o.id, crTime(o.createdAt), PREP_LABEL[prepOf(o)], l.name, l.variantName || "", l.qty, l.unitPrice, l.subtotal, ""]);
+        rows.push([a.name, a.whatsapp, a.table, o.id, crTime(o.createdAt), o.bscBy === "staff" ? "Staff" : "Cliente", PREP_LABEL[prepOf(o)], l.name, l.variantName || "", l.qty, l.unitPrice, l.subtotal, "", "", ""]);
       }
     }
-    if (a.promo.applied) rows.push([a.name, a.whatsapp, a.table, "", "", "", `Promo: ${a.promo.item?.name || ""} incluido`, "", 1, -a.promo.amount, -a.promo.amount, ""]);
-    rows.push([a.name, a.whatsapp, a.table, "", "", "", "TOTAL DE LA CUENTA", "", "", "", a.total, a.paid ? "Pagada" : "Abierta"]);
+    if (a.promo.applied) rows.push([a.name, a.whatsapp, a.table, "", "", "", "", `Promo: ${a.promo.item?.name || ""} incluido`, "", 1, -a.promo.amount, -a.promo.amount, "", "", ""]);
+    rows.push([a.name, a.whatsapp, a.table, "", "", "", "", "TOTAL DE LA CUENTA", "", "", "", a.total, a.paid ? "Pagada" : "Abierta", a.pay ? PAY_LABEL[a.pay] : "", a.paidAt ? crTime(a.paidAt) : ""]);
   }
   return "﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n");
 }
@@ -371,6 +491,7 @@ export function normalizeBsc(raw: Partial<BscSettings> | null | undefined, defau
     slug: defaults.slug,
     name: str(r.name, 60) || defaults.name,
     venue: str(r.venue, 80) || defaults.venue,
+    editionId: typeof r.editionId === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.editionId) ? r.editionId : crDate(validIso(r.startsAt) || defaults.startsAt),
     startsAt: validIso(r.startsAt) || defaults.startsAt,
     availableFrom: from,
     availableUntil: until,
