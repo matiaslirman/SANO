@@ -93,11 +93,21 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
   de la portada **solo aparece dentro de la ventana** (`PublicStatus.bsc`). **El servidor es la autoridad**: `POST /api/bsc/orders` responde 409
   fuera de la ventana o con el interruptor apagado (`bscOpen`). El dueño con sesión ve la página siempre (vista previa) y puede probar pedidos.
 - **Carta** (`DEFAULT_BSC` en `lib/defaults.ts`; guardada como `sano:bsc`): tragos ₡5.000 (Gin Tonic y Paloma con variante **obligatoria**), cerveza ₡2.000,
-  vino (2 variantes: ₡3.500 / ₡4.000, **nombres pendientes**: hoy "Opción ₡3.500/₡4.000"), 5 platos para picar ₡3.000. Precios y variantes salen
-  de la carta, nunca del cliente.
-- **Promo** (`applyPromo` en `lib/bsc.ts`): "primer plato para picar incluido con tu primer trago" — **por persona, una sola vez**: con ≥1 trago
-  de la casa (`promoTrigger`) en la cuenta, el **primer** plato para picar (`promoEligible`) que pidió esa persona sale a ₡0, sin importar el
-  orden ni cuántos pedidos use. **Cerveza y vino no la activan.** Es de la **cuenta**, no del pedido.
+  vino (2 variantes: ₡3.500 / ₡4.000, **nombres pendientes**: hoy "Opción ₡3.500/₡4.000"), 5 platos para picar ₡3.000 (Papitas Pinterest, Fondue de queso,
+  Guacamole, **Carpaccio de Salmón con Reducción Balsámica** —reemplazó al Platito mixto; `migrateItems` en `lib/bsc.ts` lo cambia solo en lo ya guardado,
+  conservando posición, precio y visibilidad, y la primera edición sigue mostrando «Platito mixto»— y Hummus). Precios y variantes salen de la carta, nunca del cliente.
+- **Cortesía** (desde la 2.ª edición; `courtesyOf` / `checkBscOrder` en `lib/bsc.ts`): **por 2 tragos de la casa, una cortesía por persona**: la **Opción 1** o la
+  **Opción 2**, que **da el restaurante**. No es un ítem de la carta: se guarda como una línea de **₡0** (`cat: "cortesia"`, `cortesia: "1" | "2"`, nombre
+  «Cortesía · Opción N»), así que **no cambia ningún total**. **Etiqueta genérica para el staff**: la comanda, "Qué preparar" (bloque «Cortesías (las da el
+  restaurante)»), el CSV y Ventas solo muestran «Opción 1» / «Opción 2»; el texto que describe cada opción (`BscSettings.cortesia.options[].desc`, opcional) es
+  **solo para el cliente**. Cuentan los tragos con `promoTrigger` (los de la casa; **cerveza y vino no**), **sumados en todos los pedidos de la persona en la
+  edición**; el mínimo es configurable (`cortesia.tragos`, 2 por defecto, 1–10, en Carta y edición). **El servidor valida**: sin los tragos, o si ya la recibió, o
+  con una opción inexistente → 400; el cliente no le puede poner precio. El cliente la elige en su pedido (el celular recuerda sus tragos y si ya la recibió); el
+  staff la registra en **Nueva comanda** (también como pedido aparte, cuando la cuenta ya calificó: la cuenta muestra «Cortesía disponible»). Ventas la cuenta
+  aparte (`eventTotals().cortesias`: por opción, entregadas y por entregar) y **no la mezcla con los platos vendidos**. Cobertura del costo y reparto con el
+  restaurante: decisión pendiente (ver "Reparto").
+- **Primera edición (19/11)**: la regla era «primer plato para picar incluido con el primer trago» (`applyPromo`, con `promoEligible`/`promoTrigger` guardados en cada
+  línea). **Se conserva solo para leer esos pedidos** (sus totales no cambian); los pedidos nuevos ya no guardan `promoEligible` (`applyPromo` da ₡0 para ellos).
 - **Cuenta por persona** (`accountKey`/`buildAccounts`): mismo teléfono (últimos 8 dígitos) = misma persona; sin teléfono, mismo nombre exacto
   (sin tildes ni mayúsculas). El celular recuerda nombre/teléfono/mesa (`sano:bsc:contact`) para que sus pedidos caigan en la misma cuenta.
   Cuenta pagada = todos sus pedidos pagados; un pedido nuevo la reabre sola.
@@ -111,18 +121,18 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
   fechas. La edición anterior queda consultable en el selector "Edición" y en la tabla de ediciones de Ventas.
 - **Plataforma del staff** (`/admin/bsc`, pestaña "Bistro Social Club" mientras el interruptor esté encendido; `BscView.tsx` con tres vistas):
   - **Comanda** (`BscComanda.tsx`): **Disponibilidad** (un toque marca un ítem *agotado*; desaparece al instante de la página de los clientes),
-    **Nueva comanda** (`BscCaptura.tsx`: el equipo carga lo que pide cada persona; mismo servidor, mismos precios y misma promo, calculada sobre la
-    cuenta completa; "+ Pedido" en una cuenta la precarga), **Qué preparar ahora**, cuentas por persona con estado de cada pedido (un toque avanza),
+    **Nueva comanda** (`BscCaptura.tsx`: el equipo carga lo que pide cada persona; mismo servidor y mismos precios; la cortesía se mira sobre la cuenta
+    completa; "+ Pedido" en una cuenta la precarga), **Qué preparar ahora**, cuentas por persona con estado de cada pedido (un toque avanza),
     **Cobrar cuenta** (pide el método: efectivo, SINPE o tarjeta; guarda método y hora) / Reabrir, filtros, CSV e imprimir.
   - **Ventas** (`BscVentas.tsx`): **Facturado** (= suma de totales de las cuentas, ya con promos), Cobrado, Por cobrar, ticket promedio, **cobrado por método**
     (para cuadrar la caja), tabla **"Lo vendido y lo que salió"** por ítem (pedidos / salió = entregado / falta / ingreso) que **cuadra siempre**:
     bruto − promos = facturado, y los métodos suman lo cobrado; ventas por hora (hora CR, cruza la medianoche); resumen por edición; CSV.
   - **Carta y edición** (`BscEditor.tsx`): **agregar, quitar y ordenar platos y bebidas** (categorías fijas: tragos, cerveza y vino, para picar), precios,
-    variantes (con precio propio o el base), foto (de `public/bsc/fotos`), qué ítems activan o reciben la promo; fechas y ventana; nueva edición.
+    variantes (con precio propio o el base), foto (de `public/bsc/fotos`), qué tragos cuentan para la cortesía; la **cortesía** (tragos necesarios y texto de cada opción para el cliente); fechas y ventana; nueva edición.
     Los ítems nuevos estrenan un id legible a partir del nombre; un ítem quitado no afecta los pedidos ya hechos (guardan su propia copia de la línea).
   Protegida por la sesión del panel; botones de 44 px; se actualiza sola cada 8 s. La comanda sigue accesible después de la ventana.
 - API: `/api/bsc/orders` (POST público en ventana, o del staff con `staff: true`; GET staff), `/api/bsc/settings` (staff), `/api/bsc/accounts` (staff: cobrar con método / reabrir).
-- **Pendientes del dueño** (confirmar, no inventar): qué distingue los dos vinos, si cerveza/vino deben activar la promo, derechos de uso públicos de
+- **Pendientes del dueño** (confirmar, no inventar): qué distingue los dos vinos, si el texto de las Opciones 1 y 2 se le muestra al cliente (hoy vacío = solo «Opción N»), cómo se reparte el costo de la cortesía con el restaurante, derechos de uso públicos de
   las fotos (algunas las aportó el cliente), cómo se cobra la cuenta (la página no dice nada al respecto), y los logos en SVG (los PNG son de baja resolución).
 - `app/evento/page.tsx` — ventana privada protegida por código (`components/EventGate.tsx`).
 - `app/admin/*` — panel: **Pedidos · Viaje Sano · Bistro Social Club (temporal) · Resumen cocina · Etiquetas · Analítica · Contenido**

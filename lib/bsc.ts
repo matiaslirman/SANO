@@ -3,13 +3,13 @@
  * promo por persona, cuentas de la comanda y exportación. Todo en hora de Costa Rica (UTC−6, sin horario de verano).
  * El servidor es la autoridad: del cliente solo se leen ids, variantes y cantidades; el precio sale de la carta.
  */
-import type { BscCatId, BscItem, BscPay, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
+import type { BscCatId, BscCortesiaOption, BscItem, BscPay, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
 import { crc } from "./format";
 
 export const BSC_CATS: { id: BscCatId; name: string; sub?: string }[] = [
   { id: "tragos", name: "Tragos de la casa" },
   { id: "bebidas", name: "Cerveza y vino" },
-  { id: "picar", name: "Para picar", sub: "El primero va incluido con tu primer trago" },
+  { id: "picar", name: "Para picar" },
 ];
 const CAT_ORDER: Record<BscCatId, number> = { tragos: 0, bebidas: 1, picar: 2 };
 const isCat = (v: unknown): v is BscCatId => v === "tragos" || v === "bebidas" || v === "picar";
@@ -19,7 +19,7 @@ export const MAX_LINES = 30;
 export const PAY_METHODS: BscPay[] = ["efectivo", "sinpe", "tarjeta"];
 export const PAY_LABEL: Record<BscPay | "sin", string> = { efectivo: "Efectivo", sinpe: "SINPE Móvil", tarjeta: "Tarjeta", sin: "Sin método" };
 /** Fotos disponibles en /public/bsc/fotos para asignar a un ítem desde el panel. */
-export const BSC_PHOTOS = ["gintonic.jpg", "paloma.jpg", "playero.jpg", "papitas.jpg", "fondue.jpg", "guacamole.jpg", "platito.jpg", "hummus.jpg"];
+export const BSC_PHOTOS = ["gintonic.jpg", "paloma.jpg", "playero.jpg", "papitas.jpg", "fondue.jpg", "guacamole.jpg", "carpaccio-salmon.jpg", "hummus.jpg"];
 /** Los pedidos de la primera edición (19/11/2026) se guardaron sin edición: se les asigna esta. */
 export const LEGACY_EDITION = "2026-11-19";
 export const PREP_FLOW: BscPrep[] = ["recibido", "preparando", "entregado"];
@@ -161,6 +161,43 @@ export function priceLabel(item: BscItem): string {
   return min === max ? crc(min) : `${crc(min)} / ${crc(max)}`;
 }
 
+// ── Cortesía: 2 tragos de la casa → una cortesía (Opción 1 u Opción 2) por persona ──────────
+// La da el restaurante. No es un ítem de la carta: se registra como una línea de ₡0 con etiqueta genérica
+// («Cortesía · Opción 1»), así que el staff solo ve «Opción 1» / «Opción 2» y no cambia ningún total.
+
+export const CORTESIA_ID = "cortesia";
+export const CORTESIA_TRAGOS_DEFAULT = 2;
+export const cortesiaLabel = (optionId: string) => `Opción ${optionId}`;
+export const isCortesiaLine = (l: Pick<OrderBscLine, "id" | "cat">) => l.cat === "cortesia" || l.id === CORTESIA_ID;
+
+/** Opciones de cortesía con el texto que ve el cliente (el staff nunca ve `desc`). */
+export function cortesiaOptions(s: Pick<BscSettings, "cortesia">): { id: string; label: string; desc: string }[] {
+  return (s.cortesia?.options || []).map((o) => ({ id: o.id, label: cortesiaLabel(o.id), desc: o.desc || "" }));
+}
+
+export interface CortesiaStatus {
+  /** Tragos de la casa que lleva la cuenta (los que cuentan para la cortesía). */
+  tragos: number;
+  /** Con los tragos que lleva ya le corresponde una cortesía. */
+  qualifies: boolean;
+  /** La cortesía que ya recibió (una por persona), si la hay. */
+  given?: { orderId: string; optionId: string };
+}
+
+/** Estado de la cortesía de UNA cuenta (sus pedidos de la edición) con el mínimo de tragos configurado. */
+export function courtesyOf(orders: Pick<Order, "id" | "bsc">[], min: number): CortesiaStatus {
+  let tragos = 0;
+  let given: CortesiaStatus["given"];
+  for (const o of orders) {
+    for (const l of o.bsc || []) {
+      if (isCortesiaLine(l)) {
+        if (!given) given = { orderId: o.id, optionId: l.cortesia || "" };
+      } else if (l.promoTrigger) tragos += l.qty;
+    }
+  }
+  return { tragos, qualifies: tragos >= Math.max(1, min), ...(given ? { given } : {}) };
+}
+
 // ── Validación del pedido (autoridad del servidor) ──────────
 
 export type BscOrderCheck =
@@ -174,7 +211,7 @@ export function checkBscOrder(
   input: Record<string, unknown>,
   s: BscSettings,
   now: Date = new Date(),
-  opts: { ignoreWindow?: boolean } = {}
+  opts: { ignoreWindow?: boolean; /** Pedidos que esa persona ya tiene en esta edición (para validar la cortesía). */ accountOrders?: Pick<Order, "id" | "bsc">[] } = {}
 ): BscOrderCheck {
   if (!opts.ignoreWindow && !bscOpen(now, s)) return { ok: false, error: "Bistro Social Club no está recibiendo pedidos ahora.", code: "closed" };
   const bad = (error: string): BscOrderCheck => ({ ok: false, error, code: "invalid" });
@@ -190,9 +227,14 @@ export function checkBscOrder(
   if (raw.length > MAX_LINES) return bad("Son demasiados ítems en un solo pedido.");
   const byId = new Map(s.items.map((i) => [i.id, i]));
   const merged = new Map<string, OrderBscLine>();
+  const wanted: string[] = []; // cortesías pedidas en este pedido (máximo una)
   for (const l of raw) {
     if (!l || typeof l !== "object") continue;
     const id = str((l as Record<string, unknown>).id, 40);
+    if (id === CORTESIA_ID) {
+      wanted.push(str((l as Record<string, unknown>).optionId, 4));
+      continue;
+    }
     const qtyN = Math.floor(Number((l as Record<string, unknown>).qty));
     if (!Number.isFinite(qtyN) || qtyN <= 0) continue;
     const item = byId.get(id);
@@ -216,10 +258,21 @@ export function checkBscOrder(
       unitPrice: up,
       subtotal: up * qty,
       ...(item.promoTrigger ? { promoTrigger: true } : {}),
-      ...(item.promoEligible ? { promoEligible: true } : {}),
     });
   }
   const lines = [...merged.values()];
+
+  if (wanted.length > 0) {
+    if (wanted.length > 1) return bad("La cortesía es una por persona: elegí la Opción 1 o la Opción 2.");
+    const option = (s.cortesia?.options || []).find((o) => o.id === wanted[0]);
+    if (!option) return bad("Elegí la Opción 1 o la Opción 2 para la cortesía.");
+    const min = s.cortesia?.tragos ?? CORTESIA_TRAGOS_DEFAULT;
+    // los tragos de este pedido se suman a los que la persona ya tiene en la edición
+    const status = courtesyOf([...(opts.accountOrders || []), { id: "nuevo", bsc: lines }], min);
+    if (status.given && status.given.orderId !== "nuevo") return bad("Ya recibiste tu cortesía: es una por persona.");
+    if (!status.qualifies) return bad(`Para la cortesía hacen falta ${min} tragos de la casa en tu cuenta (llevás ${status.tragos}).`);
+    lines.push({ id: CORTESIA_ID, cat: "cortesia", name: `Cortesía · ${cortesiaLabel(option.id)}`, cortesia: option.id, qty: 1, unitPrice: 0, subtotal: 0 });
+  }
   if (lines.length === 0) return bad("Tu pedido está vacío.");
   return {
     ok: true,
@@ -232,7 +285,7 @@ export function checkBscOrder(
   };
 }
 
-// ── Promo: «Primer plato para picar incluido con tu primer trago» ───────────
+// ── Promo de la PRIMERA edición: «Primer plato para picar incluido con tu primer trago» (solo para leer esos pedidos) ──
 
 export interface PromoResult {
   applied: boolean;
@@ -290,6 +343,9 @@ export interface BscAccount {
   /** Cómo y cuándo se cobró (solo si la cuenta está pagada). */
   pay?: BscPay;
   paidAt?: string;
+  /** Tragos de la casa que lleva y la cortesía (Opción 1/2) que ya recibió, si la hay. */
+  tragos: number;
+  cortesia?: { orderId: string; optionId: string };
 }
 
 export const prepOf = (o: Pick<Order, "bscPrep">): BscPrep => o.bscPrep || "recibido";
@@ -309,6 +365,7 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
     const promo = applyPromo(chrono);
     const subtotal = chrono.reduce((t, o) => t + o.total, 0);
     const paid = chrono.every((o) => o.status === "pagado");
+    const cort = courtesyOf(chrono, CORTESIA_TRAGOS_DEFAULT);
     const payer = paid ? [...chrono].reverse().find((o) => o.bscPay) : undefined;
     out.push({
       key,
@@ -322,6 +379,8 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
       paid,
       lastAt: last.createdAt,
       pendingPrep: chrono.filter((o) => prepOf(o) !== "entregado").length,
+      tragos: cort.tragos,
+      ...(cort.given ? { cortesia: cort.given } : {}),
       ...(payer?.bscPay ? { pay: payer.bscPay } : {}),
       ...(paid ? { paidAt: chrono.map((o) => o.bscPaidAt || "").sort().pop() || undefined } : {}),
     });
@@ -342,18 +401,32 @@ export interface BscTotals {
   promoMonto: number;
   /** Lo cobrado, por método (las cuentas pagadas sin método van en «sin»). */
   porMetodo: Record<BscPay | "sin", number>;
+  /** Cortesías (las da el restaurante): cuántas se dieron por opción y cuántas faltan por entregar. No suman a las ventas. */
+  cortesias: { total: number; pendientes: number; porOpcion: Record<string, { total: number; pendientes: number }> };
   /** Por ítem y variante: lo pedido, lo que salió (entregado), lo que falta y lo facturado en bruto. */
   items: { key: string; cat: BscCatId; name: string; variantName?: string; qty: number; delivered: number; pending: number; revenue: number }[];
 }
 
 export function eventTotals(accounts: BscAccount[]): BscTotals {
   const items = new Map<string, BscTotals["items"][number]>();
+  const cortesias: BscTotals["cortesias"] = { total: 0, pendientes: 0, porOpcion: {} };
   for (const a of accounts) {
     for (const o of a.orders) {
       const pend = prepOf(o) !== "entregado";
       for (const l of o.bsc || []) {
+        if (isCortesiaLine(l)) {
+          // la cortesía no es una venta: se cuenta aparte (ingreso ₡0)
+          const opt = (cortesias.porOpcion[l.cortesia || "?"] ||= { total: 0, pendientes: 0 });
+          opt.total += l.qty;
+          cortesias.total += l.qty;
+          if (pend) {
+            opt.pendientes += l.qty;
+            cortesias.pendientes += l.qty;
+          }
+          continue;
+        }
         const key = `${l.id}:${l.variantId || ""}`;
-        const cur = items.get(key) || { key, cat: l.cat, name: l.name, variantName: l.variantName, qty: 0, delivered: 0, pending: 0, revenue: 0 };
+        const cur = items.get(key) || { key, cat: l.cat as BscCatId, name: l.name, variantName: l.variantName, qty: 0, delivered: 0, pending: 0, revenue: 0 };
         cur.qty += l.qty;
         cur.revenue += l.subtotal;
         if (pend) cur.pending += l.qty;
@@ -375,6 +448,7 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
     promos: accounts.filter((a) => a.promo.applied).length,
     promoMonto: sum((a) => a.promo.amount),
     porMetodo,
+    cortesias,
     items: [...items.values()].sort((a, b) => CAT_ORDER[a.cat] - CAT_ORDER[b.cat] || b.qty - a.qty || a.name.localeCompare(b.name)),
   };
 }
@@ -480,12 +554,20 @@ export function normalizeBsc(raw: Partial<BscSettings> | null | undefined, defau
             ...(variants.length ? { variants } : {}),
             ...(typeof i.image === "string" && /^[a-z0-9-]+\.(jpg|png|webp)$/.test(i.image) ? { image: i.image } : {}),
             ...(i.promoTrigger ? { promoTrigger: true } : {}),
-            ...(i.promoEligible ? { promoEligible: true } : {}),
             active: i.active !== false,
           };
         })
         .filter((i) => i.id && !seen.has(i.id) && (seen.add(i.id), true))
     : defaults.items;
+  const rawC = (r as Partial<BscSettings>).cortesia;
+  const cortesia: BscSettings["cortesia"] = {
+    tragos: Math.min(10, Math.max(1, Math.floor(Number(rawC?.tragos)) || defaults.cortesia.tragos)),
+    // siempre exactamente dos opciones, con etiqueta genérica; solo el texto para el cliente es editable
+    options: (["1", "2"] as const).map((id): BscCortesiaOption => {
+      const d = str(rawC?.options?.find((o) => o?.id === id)?.desc, 120);
+      return { id, ...(d ? { desc: d } : {}) };
+    }),
+  };
   return {
     enabled: r.enabled === undefined ? defaults.enabled : r.enabled !== false,
     slug: defaults.slug,
@@ -495,6 +577,20 @@ export function normalizeBsc(raw: Partial<BscSettings> | null | undefined, defau
     startsAt: validIso(r.startsAt) || defaults.startsAt,
     availableFrom: from,
     availableUntil: until,
-    items: items.length ? items : defaults.items,
+    items: items.length ? migrateItems(items) : defaults.items,
+    cortesia,
   };
+}
+
+/**
+ * Cambios de carta que se aplican solos a lo guardado: el «Platito mixto» pasó a ser el «Carpaccio de Salmón con Reducción
+ * Balsámica» (con su foto). Conserva posición, precio y visibilidad; los pedidos viejos guardan su propia copia de la línea,
+ * así que la primera edición sigue mostrando «Platito mixto».
+ */
+function migrateItems(items: BscItem[]): BscItem[] {
+  return items.map((i) =>
+    i.id === "platito-mixto" && i.name === "Platito mixto" && !items.some((x) => x.id === "carpaccio-salmon")
+      ? { id: "carpaccio-salmon", cat: i.cat, name: "Carpaccio de Salmón con Reducción Balsámica", price: i.price, active: i.active, image: "carpaccio-salmon.jpg" }
+      : i
+  );
 }

@@ -473,3 +473,13 @@
   .bsc-adm-hours .v{grid-column:1 / -1}
 }
 @media print{.bsc-cap,.bsc-avail,.bsc-adm-top,.bsc-adm-tabs{display:none!important}}
+
+/* cortesía: etiquetas genéricas para el staff */
+.bsc-cap-cort{margin-top:16px;border:1.5px dashed var(--bordo);border-radius:12px;padding:12px 14px;background:#FFFDF7}
+.bsc-cap-cort .h{font-family:var(--disp);text-transform:uppercase;letter-spacing:.04em;color:var(--bordo)}
+.bsc-cap-cort .h small{font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--muted);font-size:12.5px}
+.bsc-cap-cort p{margin:6px 0 0;font-size:14.5px}
+.bsc-cap-cort .opts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.bsc-cap-cort .opts button{min-height:52px;min-width:140px;border-radius:12px;border:1.5px solid var(--bordo);background:#fff;color:var(--bordo);font-family:var(--disp);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:1rem;cursor:pointer;touch-action:manipulation}
+.bsc-cap-cort .opts button.on{background:var(--bordo);color:var(--crema)}
+.bsc-adm-prep-grid .cat.cort{background:#FBF1DE;border-color:#EFDCB4}

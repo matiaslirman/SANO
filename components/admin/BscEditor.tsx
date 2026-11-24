@@ -13,6 +13,8 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
   const [from, setFrom] = useState(isoToCrLocal(settings.availableFrom));
   const [until, setUntil] = useState(isoToCrLocal(settings.availableUntil));
   const [items, setItems] = useState<BscItem[]>(settings.items);
+  const [cTragos, setCTragos] = useState<number>(settings.cortesia.tragos);
+  const [cDesc, setCDesc] = useState<Record<string, string>>({ "1": settings.cortesia.options.find((o) => o.id === "1")?.desc || "", "2": settings.cortesia.options.find((o) => o.id === "2")?.desc || "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -23,7 +25,7 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
 
   function addItem(cat: BscCatId) {
     const id = slugId("nuevo item", items.map((i) => i.id));
-    setItems((s) => [...s, { id, cat, name: "", price: 0, active: true, ...(cat === "tragos" ? { promoTrigger: true } : {}), ...(cat === "picar" ? { promoEligible: true } : {}) }]);
+    setItems((s) => [...s, { id, cat, name: "", price: 0, active: true, ...(cat === "tragos" ? { promoTrigger: true } : {}) }]);
   }
   function removeItem(i: BscItem) {
     if (!confirm(`¿Quitar «${i.name || "este ítem"}» de la carta?\nLos pedidos que ya lo tienen no se tocan. Si solo se acabó, usá «Agotado» en la Comanda.`)) return;
@@ -80,7 +82,11 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
       const r = await fetch("/api/bsc/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled, name, venue, startsAt: s, availableFrom: f, availableUntil: u, items: prepared, ...extra }),
+        body: JSON.stringify({
+          enabled, name, venue, startsAt: s, availableFrom: f, availableUntil: u, items: prepared,
+          cortesia: { tragos: cTragos, options: [{ id: "1", desc: cDesc["1"] }, { id: "2", desc: cDesc["2"] }] },
+          ...extra,
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "No se pudo guardar.");
@@ -140,6 +146,25 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
       </div>
 
       <div className="editcard bsc-adm-edit">
+        <h3>Cortesía</h3>
+        <div className="sub">
+          Con cierta cantidad de tragos de la casa en la cuenta, cada persona gana <b>una cortesía</b>: la <b>Opción 1</b> o la <b>Opción 2</b>. La da el restaurante.
+          Al equipo siempre se le muestra solo «Opción 1» u «Opción 2»; el texto de abajo es <b>solo para el cliente</b> (si lo dejás vacío, el cliente ve solo la etiqueta).
+        </div>
+        <div className="ev-grid">
+          <div className="field"><label>Tragos necesarios para la cortesía</label><input type="number" min={1} max={10} value={cTragos} onChange={(e) => setCTragos(parseInt(e.target.value) || 1)} /></div>
+          <div />
+          <div className="field"><label>Opción 1 · texto para el cliente (opcional)</label><input value={cDesc["1"]} onChange={(e) => setCDesc((d) => ({ ...d, "1": e.target.value }))} maxLength={120} placeholder="Ej: Algo para picar" /></div>
+          <div className="field"><label>Opción 2 · texto para el cliente (opcional)</label><input value={cDesc["2"]} onChange={(e) => setCDesc((d) => ({ ...d, "2": e.target.value }))} maxLength={120} placeholder="Ej: Algo dulce" /></div>
+        </div>
+        <div>
+          <button className="save-btn" onClick={() => save()} disabled={busy}>{busy ? "Guardando…" : "Guardar cambios"}</button>
+          {msg && <span className="saved-msg">{msg}</span>}
+          {err && <span className="saved-msg" style={{ color: "#9a2020" }}>{err}</span>}
+        </div>
+      </div>
+
+      <div className="editcard bsc-adm-edit">
         <h3>Carta</h3>
         <div className="sub">
           Agregá platos y bebidas, cambiá precios y orden. Para marcar algo como <b>agotado</b> esta noche usá la pestaña Comanda (un toque). Un ítem quitado no afecta los pedidos ya hechos.
@@ -168,10 +193,8 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
                 </div>
                 <div className="row opts">
                   <label className="chk"><input type="checkbox" checked={i.active} onChange={(e) => setItem(i.id, { active: e.target.checked })} /> Visible</label>
-                  {cat.id === "picar" ? (
-                    <label className="chk"><input type="checkbox" checked={!!i.promoEligible} onChange={(e) => setItem(i.id, { promoEligible: e.target.checked })} /> Puede salir incluido</label>
-                  ) : (
-                    <label className="chk"><input type="checkbox" checked={!!i.promoTrigger} onChange={(e) => setItem(i.id, { promoTrigger: e.target.checked })} /> Activa la promo</label>
+                  {cat.id !== "picar" && (
+                    <label className="chk"><input type="checkbox" checked={!!i.promoTrigger} onChange={(e) => setItem(i.id, { promoTrigger: e.target.checked })} /> Cuenta para la cortesía</label>
                   )}
                 </div>
                 {i.variants?.map((v) => (
@@ -199,7 +222,7 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
 
         <div className="ev-hint">
           Con variantes, la persona tiene que elegir una. Una variante sin precio usa el precio base; con precio propio (como el vino) el base puede quedar en 0.
-          La promo se activa con los ítems marcados «Activa la promo» y descuenta el primer plato «Puede salir incluido», una vez por persona.
+          La cortesía se gana con los tragos marcados «Cuenta para la cortesía» (hoy, los tragos de la casa; cerveza y vino no).
         </div>
 
         <div>

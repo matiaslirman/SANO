@@ -204,6 +204,8 @@ export type BscPrep = "recibido" | "preparando" | "entregado";
 /** Cómo se cobró una cuenta (para cuadrar la caja al cierre). */
 export type BscPay = "efectivo" | "sinpe" | "tarjeta";
 export type BscCatId = "tragos" | "bebidas" | "picar";
+/** Categoría de una línea de pedido: las de la carta o la cortesía (no es un ítem de la carta, la da el restaurante). */
+export type BscLineCat = BscCatId | "cortesia";
 
 export interface BscVariant {
   id: string;
@@ -221,11 +223,18 @@ export interface BscItem {
   /** Variantes: si hay, la persona elige una (obligatorio). */
   variants?: BscVariant[];
   image?: string; // ruta bajo /bsc/fotos
-  /** Con al menos uno de estos en la cuenta se activa la promo. */
+  /** Estos tragos cuentan para ganar la cortesía (cuántos hacen falta: `BscSettings.cortesia.tragos`). */
   promoTrigger?: boolean;
-  /** Estos platos pueden salir incluidos por la promo (el primero de la cuenta). */
+  /** @deprecated Regla de la primera edición (plato incluido). Ya no se usa: la cortesía son las Opciones 1 y 2. */
   promoEligible?: boolean;
   active: boolean;
+}
+
+/** Una de las dos cortesías que da el restaurante. Al staff siempre se le muestra solo «Opción 1» / «Opción 2». */
+export interface BscCortesiaOption {
+  id: "1" | "2";
+  /** Texto para el cliente (opcional): qué es la opción. El staff nunca lo ve; si falta, el cliente ve solo «Opción N». */
+  desc?: string;
 }
 
 export interface BscSettings {
@@ -240,12 +249,14 @@ export interface BscSettings {
   availableFrom: string;  // desde cuándo se ve y acepta pedidos (ISO)
   availableUntil: string; // hasta cuándo (ISO)
   items: BscItem[];
+  /** Regalía por consumo: con `tragos` tragos de la casa en la cuenta, una cortesía (Opción 1 u Opción 2) por persona. */
+  cortesia: { tragos: number; options: BscCortesiaOption[] };
 }
 
 /** Línea de un pedido del evento: con el precio del momento (el servidor es la autoridad). */
 export interface OrderBscLine {
   id: string;
-  cat: BscCatId;
+  cat: BscLineCat;
   name: string;
   variantId?: string;
   variantName?: string;
@@ -254,4 +265,6 @@ export interface OrderBscLine {
   subtotal: number;
   promoTrigger?: boolean;
   promoEligible?: boolean;
+  /** Si es una cortesía: la opción que se entregó ("1" | "2"). */
+  cortesia?: string;
 }

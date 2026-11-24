@@ -2,6 +2,7 @@
 // Correr con: node --experimental-strip-types --import ./scripts/ts-extensionless.mjs scripts/test-bsc.mts
 import assert from "node:assert/strict";
 import {
+  courtesyOf, cortesiaLabel, cortesiaOptions, CORTESIA_ID,
   bscState, bscOpen, crLocalToIso, isoToCrLocal, crDateTimeLabel, crTime, checkBscOrder, applyPromo, accountKey,
   buildAccounts, eventTotals, accountsCsv, normalizeBsc, priceLabel,
   crDate, orderEdition, editionLabel, nextEditionPatch, slugId, moveItem, salesByHour, editionsSummary, LEGACY_EDITION,
@@ -71,7 +72,8 @@ assert.equal(c1.lines[0].unitPrice, 5000);
 assert.equal(c1.lines[1].unitPrice, 4000); // precio de la variante
 assert.equal(c1.lines[2].qty, 20);
 assert.equal(c1.total, 2 * 5000 + 4000 + 20 * 3000);
-assert.ok(c1.lines[0].promoTrigger && !c1.lines[1].promoTrigger && c1.lines[2].promoEligible);
+assert.ok(c1.lines[0].promoTrigger && !c1.lines[1].promoTrigger);
+assert.equal(c1.lines[2].promoEligible, undefined); // la regla vieja (plato incluido) ya no se aplica a pedidos nuevos
 assert.equal(priceLabel(S.items.find((i) => i.id === "vino")!), "₡3.500 / ₡4.000");
 assert.equal(priceLabel(S.items.find((i) => i.id === "playero")!), "₡5.000");
 
@@ -319,5 +321,116 @@ assert.ok(accountsCsv(buildAccounts([{ ...e1, bscBy: "staff" } as Order])).inclu
 assert.ok(accountsCsv(buildAccounts([e1])).includes(";Cliente;"));
 
 console.log("bsc (ediciones y tracking): todos los tests OK");
+
+// ═══ Cortesía: 2 tragos → Opción 1 u Opción 2 (la da el restaurante) y carpaccio ═══════════════
+
+// ── Carta: el carpaccio reemplaza al platito mixto ──
+assert.ok(S.items.some((i) => i.id === "carpaccio-salmon" && i.name === "Carpaccio de Salmón con Reducción Balsámica" && i.image === "carpaccio-salmon.jpg" && i.price === 3000));
+assert.ok(!S.items.some((i) => i.id === "platito-mixto"));
+assert.equal(S.items.length, 10);
+assert.ok(S.items.every((i) => !i.promoEligible)); // la regla vieja ya no está en la carta
+assert.deepEqual(S.cortesia, { tragos: 2, options: [{ id: "1" }, { id: "2" }] });
+// migración de lo ya guardado (producción): conserva posición, precio y visibilidad
+const legacyItems = [
+  ...S.items.filter((i) => i.id !== "carpaccio-salmon").slice(0, 8),
+  { id: "platito-mixto", cat: "picar" as const, name: "Platito mixto", price: 3500, active: false, image: "platito.jpg", promoEligible: true },
+  ...S.items.filter((i) => i.id === "hummus"),
+];
+const mig = normalizeBsc({ items: legacyItems }, S);
+const at = mig.items.findIndex((i) => i.id === "carpaccio-salmon");
+assert.equal(at, legacyItems.findIndex((i) => i.id === "platito-mixto")); // misma posición
+assert.deepEqual([mig.items[at].price, mig.items[at].active, mig.items[at].image], [3500, false, "carpaccio-salmon.jpg"]);
+assert.ok(!mig.items.some((i) => i.id === "platito-mixto"));
+assert.ok(mig.items.every((i) => i.promoEligible === undefined));
+assert.equal(normalizeBsc({ items: mig.items }, S).items.length, mig.items.length); // idempotente
+const renamed = normalizeBsc({ items: legacyItems.map((i) => (i.id === "platito-mixto" ? { ...i, name: "Mi platito" } : i)) }, S);
+assert.ok(renamed.items.some((i) => i.id === "platito-mixto")); // si el dueño ya lo renombró, no se toca
+
+// ── Configuración de la cortesía ──
+assert.deepEqual(normalizeBsc({}, S).cortesia, { tragos: 2, options: [{ id: "1" }, { id: "2" }] });
+assert.equal(normalizeBsc({ cortesia: { tragos: 3, options: [] } }, S).cortesia.tragos, 3);
+assert.equal(normalizeBsc({ cortesia: { tragos: 99, options: [] } }, S).cortesia.tragos, 10);
+assert.equal(normalizeBsc({ cortesia: { tragos: 0, options: [] } }, S).cortesia.tragos, 2); // inválido → valor por defecto
+const cdesc = normalizeBsc({ cortesia: { tragos: 2, options: [{ id: "1", desc: "Algo rico" }, { id: "9" as never }, { id: "2", desc: "x".repeat(300) }] } }, S).cortesia;
+assert.equal(cdesc.options.length, 2); // siempre exactamente dos opciones
+assert.deepEqual(cdesc.options.map((o) => o.id), ["1", "2"]);
+assert.equal(cdesc.options[0].desc, "Algo rico");
+assert.equal(cdesc.options[1].desc?.length, 120);
+assert.deepEqual(cortesiaOptions(S), [{ id: "1", label: "Opción 1", desc: "" }, { id: "2", label: "Opción 2", desc: "" }]);
+assert.equal(cortesiaLabel("2"), "Opción 2");
+
+// ── courtesyOf: tragos de la casa y cortesía ya dada ──
+const mk = (id: string, lines: OrderBscLine[]) => ({ id, bsc: lines });
+const COR = (opt: string): OrderBscLine => ({ id: CORTESIA_ID, cat: "cortesia", name: `Cortesía · Opción ${opt}`, cortesia: opt, qty: 1, unitPrice: 0, subtotal: 0 });
+assert.deepEqual(courtesyOf([], 2), { tragos: 0, qualifies: false });
+assert.deepEqual(courtesyOf([mk("A", [trago(1)])], 2), { tragos: 1, qualifies: false });
+assert.equal(courtesyOf([mk("A", [trago(1)]), mk("B", [playero(1)])], 2).qualifies, true); // 2 tragos en pedidos distintos
+assert.equal(courtesyOf([mk("A", [trago(2)])], 3).qualifies, false); // el mínimo es configurable
+assert.equal(courtesyOf([mk("A", [cerveza(5), vino()])], 2).tragos, 0); // cerveza y vino no cuentan
+assert.deepEqual(courtesyOf([mk("A", [trago(2)]), mk("B", [COR("2")])], 2).given, { orderId: "B", optionId: "2" });
+assert.equal(courtesyOf([mk("A", [COR("1")])], 2).tragos, 0); // la cortesía misma no cuenta como trago
+
+// ── checkBscOrder con cortesía ──
+const lineIds = (lines: { id: string }[]) => lines.map((l) => l.id);
+const gin = (q: number) => ({ id: "gin-tonic", variantId: "clasico", qty: q });
+// 2 tragos en el mismo pedido + Opción 1
+const k1 = ok({ customerName: "Ana", lines: [gin(2), { id: "cortesia", optionId: "1" }] });
+assert.equal(k1.total, 10000); // la cortesía no suma nada
+const kl = k1.lines[k1.lines.length - 1];
+assert.deepEqual([kl.id, kl.cat, kl.name, kl.cortesia, kl.qty, kl.unitPrice, kl.subtotal], ["cortesia", "cortesia", "Cortesía · Opción 1", "1", 1, 0, 0]);
+assert.deepEqual(lineIds(k1.lines), ["gin-tonic", "cortesia"]);
+// 1 trago solo: no alcanza
+assert.match(err({ customerName: "Ana", lines: [gin(1), { id: "cortesia", optionId: "1" }] }).error, /hacen falta 2 tragos.*llevás 1/);
+// cerveza y vino no cuentan
+assert.match(err({ customerName: "Ana", lines: [{ id: "cerveza", qty: 4 }, { id: "vino", variantId: "v3500", qty: 2 }, { id: "cortesia", optionId: "2" }] }).error, /llevás 0/);
+// 1 trago ya pedido antes + 1 ahora = 2 → alcanza
+const before1 = [mk("SANO-1", [trago(1)])];
+const k2 = checkBscOrder({ customerName: "Ana", lines: [{ id: "playero", qty: 1 }, { id: "cortesia", optionId: "2" }] }, S, NOW, { accountOrders: before1 });
+assert.ok(k2.ok && k2.lines.at(-1)!.name === "Cortesía · Opción 2");
+// pedido solo de cortesía (el staff la entrega cuando ya calificó en pedidos anteriores)
+const k3 = checkBscOrder({ customerName: "Ana", lines: [{ id: "cortesia", optionId: "1" }] }, S, NOW, { accountOrders: [mk("SANO-1", [trago(2)])] });
+assert.ok(k3.ok && k3.total === 0 && k3.lines.length === 1);
+// ya la recibió: una por persona
+const dupC = checkBscOrder({ customerName: "Ana", lines: [gin(2), { id: "cortesia", optionId: "1" }] }, S, NOW, { accountOrders: [mk("SANO-1", [trago(2), COR("2")])] });
+assert.ok(!dupC.ok && /Ya recibiste tu cortesía/.test(dupC.error));
+// opción inexistente, y dos cortesías en un pedido
+assert.match(err({ customerName: "Ana", lines: [gin(2), { id: "cortesia", optionId: "3" }] }).error, /Opción 1 o la Opción 2/);
+assert.match(err({ customerName: "Ana", lines: [gin(2), { id: "cortesia", optionId: "1" }, { id: "cortesia", optionId: "2" }] }).error, /una por persona/);
+assert.match(err({ customerName: "Ana", lines: [gin(2), { id: "cortesia" }] }).error, /Opción 1 o la Opción 2/); // sin opción
+// el mínimo configurable (3 tragos)
+const s3 = { ...S, cortesia: { ...S.cortesia, tragos: 3 } };
+assert.ok(!checkBscOrder({ customerName: "A", lines: [gin(2), { id: "cortesia", optionId: "1" }] }, s3, NOW).ok);
+assert.ok(checkBscOrder({ customerName: "A", lines: [gin(3), { id: "cortesia", optionId: "1" }] }, s3, NOW).ok);
+// una cortesía sin nada más NO califica
+assert.match(err({ customerName: "Ana", lines: [{ id: "cortesia", optionId: "1" }] }).error, /llevás 0/);
+// el cliente no puede ponerle precio a la cortesía ni usar el id como ítem de la carta
+const k4 = ok({ customerName: "Ana", lines: [gin(2), { id: "cortesia", optionId: "1", qty: 5, price: 9999, unitPrice: 9999 }] });
+assert.equal(k4.total, 10000);
+// los platos ya no regalan nada por sí mismos (regla vieja desactivada para pedidos nuevos)
+const k5 = ok({ customerName: "Ana", lines: [gin(3), { id: "guacamole", qty: 1 }] });
+assert.equal(applyPromo([{ id: "x", seq: 1, createdAt: T0, bsc: k5.lines }]).applied, false);
+
+// ── Cuentas y totales con cortesías ──
+const cA = O("Cortes Uno", "7444 0001", T0, [trago(2), COR("1")], "pendiente", "entregado"); // la cortesía se entregó
+const cB = O("Cortes Dos", "7444 0002", T1, [playero(2), COR("2")], "pendiente", "recibido"); // falta entregarla
+// las líneas de un pedido NUEVO salen de checkBscOrder (sin la marca vieja de «plato incluido»)
+const cC = O("Cortes Tres", "7444 0003", T2, ok({ customerName: "Cortes Tres", lines: [gin(1), { id: "guacamole", qty: 1 }] }).lines, "pendiente", "entregado");
+const accC = buildAccounts([cA, cB, cC]);
+const one = accC.find((a) => a.name === "Cortes Uno")!;
+assert.deepEqual([one.tragos, one.cortesia], [2, { orderId: cA.id, optionId: "1" }]);
+assert.equal(one.total, 10000); // la cortesía no cambia el total de la cuenta
+assert.equal(accC.find((a) => a.name === "Cortes Tres")!.cortesia, undefined);
+assert.equal(accC.find((a) => a.name === "Cortes Tres")!.promo.applied, false); // nada se regala por el plato
+const tC = eventTotals(accC);
+assert.deepEqual(tC.cortesias, { total: 2, pendientes: 1, porOpcion: { "1": { total: 1, pendientes: 0 }, "2": { total: 1, pendientes: 1 } } });
+assert.ok(!tC.items.some((i) => i.name.startsWith("Cortesía"))); // no aparecen como ítems vendidos
+assert.equal(tC.bruto, 10000 + 10000 + 5000 + 3000);
+assert.equal(tC.bruto - tC.promoMonto, tC.ventas); // sigue cuadrando
+assert.ok(accountsCsv(accC).includes("Cortesía · Opción 1") && accountsCsv(accC).includes("Cortesía · Opción 2"));
+// la primera edición no cambia: sus pedidos con la regla vieja conservan su descuento
+const old1 = O("Vieja", "7555 0001", T0, [trago(1), plato()]);
+assert.equal(buildAccounts([old1])[0].promo.amount, 3000);
+
+console.log("bsc (cortesía y carpaccio): todos los tests OK");
 
 console.log("bsc: todos los tests OK");

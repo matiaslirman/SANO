@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { isAdmin } from "@/lib/auth-server";
-import { accountKey, bscOpen, buildAccounts, checkBscOrder } from "@/lib/bsc";
+import { accountKey, bscOpen, buildAccounts, checkBscOrder, cortesiaLabel, courtesyOf, orderEdition } from "@/lib/bsc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bistro Social Club no está recibiendo pedidos ahora.", closed: true }, { status: 409 });
   }
 
-  const check = checkBscOrder(body, settings, new Date(), { ignoreWindow: admin });
+  // Lo que esta persona ya pidió en ESTA edición: sirve para validar la cortesía (tragos acumulados y una sola por persona).
+  const asker = accountKey({ customerName: String(body.customerName || ""), whatsapp: String(body.whatsapp || "") });
+  const mineBefore = (await store.listBscOrders()).filter((o) => orderEdition(o) === settings.editionId && accountKey(o) === asker);
+
+  const check = checkBscOrder(body, settings, new Date(), { ignoreWindow: admin, accountOrders: mineBefore });
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.code === "closed" ? 409 : 400 });
 
   // «staff» solo lo puede marcar quien tiene sesión del panel (así se distingue lo que cargó el equipo de lo que pidió el cliente)
@@ -34,13 +38,17 @@ export async function POST(req: Request) {
 
   // Resumen de la cuenta de ESA persona (mismo teléfono o nombre): solo montos, sin líneas ni datos de otras personas.
   const key = accountKey(order);
-  const mine = buildAccounts((await store.listBscOrders()).filter((o) => accountKey(o) === key))[0];
+  const mine = buildAccounts((await store.listBscOrders()).filter((o) => orderEdition(o) === settings.editionId && accountKey(o) === key))[0];
+  const cort = mine ? courtesyOf(mine.orders, settings.cortesia.tragos) : undefined;
   const account = mine
     ? {
         orders: mine.orders.length,
         subtotal: mine.subtotal,
-        promo: { applied: mine.promo.applied, amount: mine.promo.amount, item: mine.promo.item?.name || "" },
         total: mine.total,
+        // cortesía: cuántos tragos lleva, si ya le corresponde y cuál recibió (para que el celular lo recuerde)
+        tragos: cort!.tragos,
+        qualifies: cort!.qualifies,
+        cortesia: cort!.given ? cortesiaLabel(cort!.given.optionId) : "",
       }
     : undefined;
 
