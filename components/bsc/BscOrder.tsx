@@ -200,7 +200,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         <p className="bsc-data">{datos}</p>
       </section>
 
-      <div className="bsc-promo" role="note">Por {need} tragos, una cortesía de la casa</div>
+      <div className="bsc-promo" role="note">{need === 1 ? "Con tu primer trago, una cortesía de la casa" : `Por ${need} tragos, una cortesía de la casa`}</div>
 
       <main className="bsc-main">
         {BSC_CATS.map((cat) => {
@@ -333,7 +333,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
                   </div>
                 </>
               ) : (
-                <p>Con {need} tragos de la casa en tu cuenta tenés una cortesía.{tragos > 0 ? ` Te ${faltan === 1 ? "falta 1 trago" : `faltan ${faltan} tragos`}.` : ""}</p>
+                <p>{need === 1 ? "Sumá un trago de la casa y te llevás una cortesía." : `Con ${need} tragos de la casa en tu cuenta tenés una cortesía.${tragos > 0 ? ` Te ${faltan === 1 ? "falta 1 trago" : `faltan ${faltan} tragos`}.` : ""}`}</p>
               )}
             </div>
             <div className="bsc-total"><span>Total de este pedido</span><b>{crc(total)}</b></div>
