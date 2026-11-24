@@ -96,12 +96,12 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
   vino (2 variantes: ₡3.500 / ₡4.000, **nombres pendientes**: hoy "Opción ₡3.500/₡4.000"), 5 platos para picar ₡3.000 (Papitas Pinterest, Fondue de queso,
   Guacamole, **Carpaccio de Salmón con Reducción Balsámica** —reemplazó al Platito mixto; `migrateItems` en `lib/bsc.ts` lo cambia solo en lo ya guardado,
   conservando posición, precio y visibilidad, y la primera edición sigue mostrando «Platito mixto»— y Hummus). Precios y variantes salen de la carta, nunca del cliente.
-- **Cortesía** (desde la 2.ª edición; `courtesyOf` / `checkBscOrder` en `lib/bsc.ts`): **por 2 tragos de la casa, una cortesía por persona**: la **Opción 1** o la
+- **Cortesía** (desde la 2.ª edición; `courtesyOf` / `checkBscOrder` en `lib/bsc.ts`): **con el primer trago de la casa, una cortesía por persona** (`cortesia.tragos` = 1 por defecto; antes eran 2): la **Opción 1** o la
   **Opción 2**, que **da el restaurante**. No es un ítem de la carta: se guarda como una línea de **₡0** (`cat: "cortesia"`, `cortesia: "1" | "2"`, nombre
   «Cortesía · Opción N»), así que **no cambia ningún total**. **Etiqueta genérica para el staff**: la comanda, "Qué preparar" (bloque «Cortesías (las da el
   restaurante)»), el CSV y Ventas solo muestran «Opción 1» / «Opción 2»; el texto que describe cada opción (`BscSettings.cortesia.options[].desc`, opcional) es
   **solo para el cliente**. Cuentan los tragos con `promoTrigger` (los de la casa; **cerveza y vino no**), **sumados en todos los pedidos de la persona en la
-  edición**; el mínimo es configurable (`cortesia.tragos`, 2 por defecto, 1–10, en Carta y edición). **El servidor valida**: sin los tragos, o si ya la recibió, o
+  edición**; el mínimo es configurable (`cortesia.tragos`, 1 por defecto, 1–10, en Carta y edición). **El servidor valida**: sin los tragos, o si ya la recibió, o
   con una opción inexistente → 400; el cliente no le puede poner precio. El cliente la elige en su pedido (el celular recuerda sus tragos y si ya la recibió); el
   staff la registra en **Nueva comanda** (también como pedido aparte, cuando la cuenta ya calificó: la cuenta muestra «Cortesía disponible»). Ventas la cuenta
   aparte (`eventTotals().cortesias`: por opción, entregadas y por entregar) y **no la mezcla con los platos vendidos**. Cobertura del costo y reparto con el

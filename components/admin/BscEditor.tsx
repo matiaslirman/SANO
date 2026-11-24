@@ -148,7 +148,7 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
       <div className="editcard bsc-adm-edit">
         <h3>Cortesía</h3>
         <div className="sub">
-          Con cierta cantidad de tragos de la casa en la cuenta, cada persona gana <b>una cortesía</b>: la <b>Opción 1</b> o la <b>Opción 2</b>. La da el restaurante.
+          Al llegar, con su primer trago de la casa (o la cantidad que pongas abajo), cada persona gana <b>una cortesía</b>: la <b>Opción 1</b> o la <b>Opción 2</b>. La da el restaurante.
           Al equipo siempre se le muestra solo «Opción 1» u «Opción 2»; el texto de abajo es <b>solo para el cliente</b> (si lo dejás vacío, el cliente ve solo la etiqueta).
         </div>
         <div className="ev-grid">

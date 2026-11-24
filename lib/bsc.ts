@@ -161,12 +161,12 @@ export function priceLabel(item: BscItem): string {
   return min === max ? crc(min) : `${crc(min)} / ${crc(max)}`;
 }
 
-// ── Cortesía: 2 tragos de la casa → una cortesía (Opción 1 u Opción 2) por persona ──────────
+// ── Cortesía: con el primer trago de la casa → una cortesía (Opción 1 u Opción 2) por persona ──
 // La da el restaurante. No es un ítem de la carta: se registra como una línea de ₡0 con etiqueta genérica
 // («Cortesía · Opción 1»), así que el staff solo ve «Opción 1» / «Opción 2» y no cambia ningún total.
 
 export const CORTESIA_ID = "cortesia";
-export const CORTESIA_TRAGOS_DEFAULT = 2;
+export const CORTESIA_TRAGOS_DEFAULT = 1;
 export const cortesiaLabel = (optionId: string) => `Opción ${optionId}`;
 export const isCortesiaLine = (l: Pick<OrderBscLine, "id" | "cat">) => l.cat === "cortesia" || l.id === CORTESIA_ID;
 
@@ -270,7 +270,7 @@ export function checkBscOrder(
     // los tragos de este pedido se suman a los que la persona ya tiene en la edición
     const status = courtesyOf([...(opts.accountOrders || []), { id: "nuevo", bsc: lines }], min);
     if (status.given && status.given.orderId !== "nuevo") return bad("Ya recibiste tu cortesía: es una por persona.");
-    if (!status.qualifies) return bad(`Para la cortesía hacen falta ${min} tragos de la casa en tu cuenta (llevás ${status.tragos}).`);
+    if (!status.qualifies) return bad(min === 1 ? "La cortesía va con tu primer trago de la casa: sumá un trago a tu pedido." : `Para la cortesía hacen falta ${min} tragos de la casa en tu cuenta (llevás ${status.tragos}).`);
     lines.push({ id: CORTESIA_ID, cat: "cortesia", name: `Cortesía · ${cortesiaLabel(option.id)}`, cortesia: option.id, qty: 1, unitPrice: 0, subtotal: 0 });
   }
   if (lines.length === 0) return bad("Tu pedido está vacío.");

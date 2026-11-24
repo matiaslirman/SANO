@@ -10,7 +10,8 @@ import {
 import { DEFAULT_BSC } from "../lib/defaults.ts";
 import type { Order, OrderBscLine } from "../lib/types.ts";
 
-const S = DEFAULT_BSC;
+const S_DEFAULT = DEFAULT_BSC;
+const S = { ...DEFAULT_BSC, cortesia: { ...DEFAULT_BSC.cortesia, tragos: 2 } }; // los tests de «2 tragos» usan este mínimo
 
 // ── Ventana: 00:00 CR del jueves 19 = 06:00Z; 08:00 CR del viernes 20 = 14:00Z ──
 assert.equal(bscState(new Date("2026-11-19T05:59:59Z"), S), "before");
@@ -329,7 +330,7 @@ assert.ok(S.items.some((i) => i.id === "carpaccio-salmon" && i.name === "Carpacc
 assert.ok(!S.items.some((i) => i.id === "platito-mixto"));
 assert.equal(S.items.length, 10);
 assert.ok(S.items.every((i) => !i.promoEligible)); // la regla vieja ya no está en la carta
-assert.deepEqual(S.cortesia, { tragos: 2, options: [{ id: "1" }, { id: "2" }] });
+assert.deepEqual(S_DEFAULT.cortesia, { tragos: 1, options: [{ id: "1" }, { id: "2" }] });
 // migración de lo ya guardado (producción): conserva posición, precio y visibilidad
 const legacyItems = [
   ...S.items.filter((i) => i.id !== "carpaccio-salmon").slice(0, 8),
@@ -347,10 +348,10 @@ const renamed = normalizeBsc({ items: legacyItems.map((i) => (i.id === "platito-
 assert.ok(renamed.items.some((i) => i.id === "platito-mixto")); // si el dueño ya lo renombró, no se toca
 
 // ── Configuración de la cortesía ──
-assert.deepEqual(normalizeBsc({}, S).cortesia, { tragos: 2, options: [{ id: "1" }, { id: "2" }] });
+assert.deepEqual(normalizeBsc({}, S_DEFAULT).cortesia, { tragos: 1, options: [{ id: "1" }, { id: "2" }] });
 assert.equal(normalizeBsc({ cortesia: { tragos: 3, options: [] } }, S).cortesia.tragos, 3);
 assert.equal(normalizeBsc({ cortesia: { tragos: 99, options: [] } }, S).cortesia.tragos, 10);
-assert.equal(normalizeBsc({ cortesia: { tragos: 0, options: [] } }, S).cortesia.tragos, 2); // inválido → valor por defecto
+assert.equal(normalizeBsc({ cortesia: { tragos: 0, options: [] } }, S_DEFAULT).cortesia.tragos, 1); // inválido → valor por defecto
 const cdesc = normalizeBsc({ cortesia: { tragos: 2, options: [{ id: "1", desc: "Algo rico" }, { id: "9" as never }, { id: "2", desc: "x".repeat(300) }] } }, S).cortesia;
 assert.equal(cdesc.options.length, 2); // siempre exactamente dos opciones
 assert.deepEqual(cdesc.options.map((o) => o.id), ["1", "2"]);
@@ -430,6 +431,20 @@ assert.ok(accountsCsv(accC).includes("Cortesía · Opción 1") && accountsCsv(ac
 // la primera edición no cambia: sus pedidos con la regla vieja conservan su descuento
 const old1 = O("Vieja", "7555 0001", T0, [trago(1), plato()]);
 assert.equal(buildAccounts([old1])[0].promo.amount, 3000);
+
+// ── Dinámica actual: una cortesía por persona con su PRIMER trago de la casa ──
+{
+  const P = S_DEFAULT; // mínimo por defecto = 1
+  const g1 = checkBscOrder({ customerName: "Luz", lines: [{ id: "gin-tonic", variantId: "clasico", qty: 1 }, { id: "cortesia", optionId: "1" }] }, P, NOW);
+  assert.ok(g1.ok && g1.total === 5000 && g1.lines.at(-1)!.name === "Cortesía · Opción 1");
+  const sin = checkBscOrder({ customerName: "Luz", lines: [{ id: "cerveza", qty: 2 }, { id: "cortesia", optionId: "2" }] }, P, NOW);
+  assert.ok(!sin.ok && /primer trago de la casa/.test(sin.error)); // cerveza y vino no cuentan
+  const sola = checkBscOrder({ customerName: "Luz", lines: [{ id: "cortesia", optionId: "1" }] }, P, NOW);
+  assert.ok(!sola.ok); // sin trago no hay cortesía
+  const dos = checkBscOrder({ customerName: "Luz", lines: [{ id: "playero", qty: 1 }, { id: "cortesia", optionId: "1" }] }, P, NOW, { accountOrders: [mk("SANO-1", [trago(1), COR("2")])] });
+  assert.ok(!dos.ok && /una por persona|Ya recibiste/.test(dos.error)); // la segunda no se da
+  assert.ok(courtesyOf([mk("A", [trago(1)])], P.cortesia.tragos).qualifies);
+}
 
 console.log("bsc (cortesía y carpaccio): todos los tests OK");
 

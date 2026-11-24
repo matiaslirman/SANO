@@ -244,5 +244,5 @@ export const DEFAULT_BSC: BscSettings = {
     { id: "carpaccio-salmon", cat: "picar", name: "Carpaccio de Salmón con Reducción Balsámica", price: 3000, active: true, image: "carpaccio-salmon.jpg" },
     { id: "hummus", cat: "picar", name: "Hummus", price: 3000, active: true, image: "hummus.jpg", desc: "Con vegetales." },
   ],
-  cortesia: { tragos: 2, options: [{ id: "1" }, { id: "2" }] },
+  cortesia: { tragos: 1, options: [{ id: "1" }, { id: "2" }] },
 };
