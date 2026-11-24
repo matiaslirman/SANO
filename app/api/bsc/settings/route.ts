@@ -29,6 +29,7 @@ export async function PATCH(req: Request) {
   if (typeof body.availableFrom === "string") patch.availableFrom = body.availableFrom;
   if (typeof body.availableUntil === "string") patch.availableUntil = body.availableUntil;
   if (Array.isArray(body.items)) patch.items = body.items;
+  if (body.cortesia && typeof body.cortesia === "object") patch.cortesia = body.cortesia;
   const settings = await store.saveBsc(patch);
   return NextResponse.json({ settings });
 }
