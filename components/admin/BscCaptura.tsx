@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BscSettings, Order, OrderBscLine } from "@/lib/types";
-import { BSC_CATS, MAX_QTY_PER_LINE, accountKey, applyPromo, unitPrice, type BscAccount } from "@/lib/bsc";
+import type { BscSettings, OrderBscLine } from "@/lib/types";
+import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, accountKey, cortesiaLabel, courtesyOf, unitPrice, type BscAccount } from "@/lib/bsc";
 import { crc } from "@/lib/format";
 
 const cartKey = (id: string, variantId?: string) => `${id}:${variantId || ""}`;
@@ -34,6 +34,7 @@ export function BscCaptura({
   const [phone, setPhone] = useState("");
   const [table, setTable] = useState("");
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [cort, setCort] = useState<string>(""); // cortesía elegida: "1" | "2" | ""
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
@@ -72,13 +73,14 @@ export function BscCaptura({
   const count = lines.reduce((t, l) => t + l.qty, 0);
   const key = name.trim() || phone.trim() ? accountKey({ customerName: name, whatsapp: phone }) : "";
   const match = key ? accounts.find((a) => a.key === key) : undefined;
-  // La promo se mira sobre toda la cuenta: lo que cambia con ESTE pedido (puede activarse o ya estar aplicada).
-  const promoDelta = useMemo(() => {
-    const prev: Pick<Order, "id" | "seq" | "createdAt" | "bsc">[] = match?.orders || [];
-    const before = applyPromo(prev).amount;
-    const after = applyPromo([...prev, { id: "nuevo", seq: 1e9, createdAt: "9999", bsc: lines }]);
-    return { amount: after.amount - before, item: after.item?.name || "" };
-  }, [match, lines]);
+  // Cortesía (la da el restaurante): se mira sobre toda la cuenta de esa persona, con lo que ya pidió y lo que lleva en este pedido.
+  const need = settings.cortesia.tragos;
+  const cs = useMemo(() => courtesyOf([...(match?.orders || []), { id: "nuevo", bsc: lines }], need), [match, lines, need]);
+  const given = cs.given && cs.given.orderId !== "nuevo" ? cs.given : undefined;
+  const canGive = cs.qualifies && !given;
+  useEffect(() => {
+    if (!canGive) setCort("");
+  }, [canGive]);
 
   const bump = (k: string, d: number) =>
     setQty((q) => {
@@ -94,7 +96,7 @@ export function BscCaptura({
     setErr("");
     setOk("");
     if (!name.trim()) return setErr("Escribí el nombre (o «Mesa 4») para saber de quién es la cuenta.");
-    if (lines.length === 0) return setErr("Agregá al menos un ítem.");
+    if (lines.length === 0 && !cort) return setErr("Agregá al menos un ítem.");
     setBusy(true);
     try {
       const r = await fetch("/api/bsc/orders", {
@@ -105,7 +107,7 @@ export function BscCaptura({
           whatsapp: phone.trim(),
           table: table.trim(),
           staff: true,
-          lines: lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),
+          lines: [...lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })), ...(cort && canGive ? [{ id: CORTESIA_ID, optionId: cort }] : [])],
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -115,6 +117,7 @@ export function BscCaptura({
       }
       setOk(`✓ ${d.order.id} registrado para ${d.order.customerName}${d.account ? ` · su cuenta va en ${crc(d.account.total)}` : ""}`);
       setQty({});
+      setCort("");
       setName("");
       setPhone("");
       setTable("");
@@ -196,7 +199,29 @@ export function BscCaptura({
         );
       })}
 
-      {lines.length > 0 && (
+      {(lines.length > 0 || cs.tragos > 0) && (
+        <div className="bsc-cap-cort">
+          <div className="h">Cortesía <small>(la da el restaurante)</small></div>
+          {given ? (
+            <p>Esta cuenta ya recibió la <b>{cortesiaLabel(given.optionId)}</b>. Es una por persona.</p>
+          ) : canGive ? (
+            <>
+              <p>Ya calificó ({cs.tragos} tragos). Elegí cuál se entrega:</p>
+              <div className="opts" role="radiogroup" aria-label="Cortesía">
+                {settings.cortesia.options.map((o) => (
+                  <button key={o.id} type="button" role="radio" aria-checked={cort === o.id} className={cort === o.id ? "on" : ""} onClick={() => setCort(cort === o.id ? "" : o.id)}>
+                    {cortesiaLabel(o.id)}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p>Faltan {need - cs.tragos} {need - cs.tragos === 1 ? "trago" : "tragos"} para la cortesía (lleva {cs.tragos}).</p>
+          )}
+        </div>
+      )}
+
+      {(lines.length > 0 || cort) && (
         <div className="bsc-cap-cart">
           <div className="h">Pedido a registrar</div>
           {lines.map((l) => {
@@ -213,16 +238,16 @@ export function BscCaptura({
               </div>
             );
           })}
-          {promoDelta.amount > 0 && (
-            <div className="ln promo"><span className="t">Con este pedido sale incluido: {promoDelta.item}</span><span className="p">−{crc(promoDelta.amount)}</span></div>
+          {cort && canGive && (
+            <div className="ln promo"><span className="t">Cortesía · {cortesiaLabel(cort)}</span><span className="p">₡0</span></div>
           )}
-          <div className="tot"><span>{count} {count === 1 ? "ítem" : "ítems"}</span><b>{crc(subtotal - promoDelta.amount)}</b></div>
+          <div className="tot"><span>{count} {count === 1 ? "ítem" : "ítems"}</span><b>{crc(subtotal)}</b></div>
         </div>
       )}
 
       {err && <p className="bsc-cap-msg err" role="alert">{err}</p>}
       {ok && <p className="bsc-cap-msg ok" role="status">{ok}</p>}
-      <button type="button" className="save-btn bsc-cap-go" onClick={submit} disabled={busy || lines.length === 0}>
+      <button type="button" className="save-btn bsc-cap-go" onClick={submit} disabled={busy || (lines.length === 0 && !cort)}>
         {busy ? "Registrando…" : "Registrar pedido"}
       </button>
     </div>

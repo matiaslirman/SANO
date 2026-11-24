@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
-import { BSC_CATS, PAY_LABEL, buildAccounts, crTime, editionLabel, editionsSummary, eventTotals, salesByHour } from "@/lib/bsc";
+import { BSC_CATS, PAY_LABEL, buildAccounts, cortesiaLabel, crTime, editionLabel, editionsSummary, eventTotals, salesByHour } from "@/lib/bsc";
 
 const cell = (v: string | number) => (/[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
 
@@ -27,6 +27,7 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
       for (const i of t.items.filter((x) => x.cat === cat.id)) rows.push([cat.name, i.name, i.variantName || "", i.qty, i.delivered, i.pending, i.revenue]);
     }
     rows.push([], ["", "Bruto", "", "", "", "", t.bruto], ["", "Promos", "", "", "", "", -t.promoMonto], ["", "Facturado", "", "", "", "", t.ventas]);
+    for (const [id, v] of Object.entries(t.cortesias.porOpcion).sort(([a], [b]) => a.localeCompare(b))) rows.push(["", `Cortesías · ${cortesiaLabel(id)}`, "", v.total, "", v.pendientes, 0]);
     rows.push(["", "Cobrado", "", "", "", "", t.cobrado], ["", "Por cobrar", "", "", "", "", t.porCobrar]);
     for (const k of ["efectivo", "sinpe", "tarjeta", "sin"] as const) rows.push(["", `Cobrado · ${PAY_LABEL[k]}`, "", "", "", "", t.porMetodo[k]]);
     const blob = new Blob(["﻿" + rows.map((r) => r.map(cell).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -117,11 +118,18 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
             </tbody>
             <tfoot>
               <tr><td colSpan={4}>Bruto (todo lo pedido)</td><td className="n tnum">{crc(t.bruto)}</td></tr>
-              <tr><td colSpan={4}>Promos ({t.promos} {t.promos === 1 ? "cuenta" : "cuentas"})</td><td className="n tnum">−{crc(t.promoMonto)}</td></tr>
+              {t.promoMonto > 0 && <tr><td colSpan={4}>Promos de la primera edición ({t.promos} {t.promos === 1 ? "cuenta" : "cuentas"})</td><td className="n tnum">−{crc(t.promoMonto)}</td></tr>}
               <tr className="fin"><td colSpan={4}>Facturado</td><td className="n tnum">{crc(t.ventas)}</td></tr>
             </tfoot>
           </table>
         </div>
+        {t.cortesias.total > 0 && (
+          <p className="sub" style={{ marginTop: 12, marginBottom: 0 }}>
+            <b>Cortesías: {t.cortesias.total}</b> (las da el restaurante, no suman a las ventas):{" "}
+            {Object.entries(t.cortesias.porOpcion).sort(([a], [b]) => a.localeCompare(b)).map(([id, v]) => `${cortesiaLabel(id)} ×${v.total}`).join(" · ")}.{" "}
+            {t.cortesias.total - t.cortesias.pendientes} ya entregadas y {t.cortesias.pendientes} por entregar.
+          </p>
+        )}
         <div className="bsc-adm-actions" style={{ marginTop: 12 }}>
           <button type="button" className="obtn" onClick={downloadCsv}>Exportar resumen (CSV)</button>
           <button type="button" className="obtn" onClick={() => window.print()}>Imprimir</button>

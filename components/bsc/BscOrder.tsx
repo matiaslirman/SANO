@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { BscItem, BscSettings, OrderBscLine } from "@/lib/types";
-import { BSC_CATS, MAX_QTY_PER_LINE, applyPromo, crDateTimeLabel, priceLabel, unitPrice } from "@/lib/bsc";
+import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, cortesiaOptions, crDateTimeLabel, priceLabel, unitPrice } from "@/lib/bsc";
 import { crc } from "@/lib/format";
 
 const CONTACT_KEY = "sano:bsc:contact";
@@ -14,7 +14,7 @@ interface Receipt {
   total: number;
   name: string;
   table?: string;
-  account?: { orders: number; subtotal: number; promo: { applied: boolean; amount: number; item: string }; total: number };
+  account?: { orders: number; subtotal: number; total: number; tragos: number; qualifies: boolean; cortesia: string };
 }
 
 const cartKey = (id: string, variantId?: string) => (variantId ? `${id}:${variantId}` : id);
@@ -53,6 +53,9 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
   const [error, setError] = useState("");
   const [closed, setClosed] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  // lo que el celular recuerda de la cuenta de esta persona (tragos acumulados y si ya recibió su cortesía)
+  const [prior, setPrior] = useState<{ name: string; phone: string; tragos: number; cortesia: string } | null>(null);
+  const [pick, setPick] = useState<string>("");
   const checkoutRef = useRef<HTMLElement>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +67,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         if (typeof c.name === "string") setName(c.name);
         if (typeof c.phone === "string") setPhone(c.phone);
         if (typeof c.table === "string") setTable(c.table);
+        if (c.prior && typeof c.prior === "object") setPrior(c.prior);
       }
     } catch {
       /* sin localStorage: no pasa nada */
@@ -92,10 +96,21 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
 
   const subtotal = lines.reduce((t, l) => t + l.subtotal, 0);
   const count = lines.reduce((t, l) => t + l.qty, 0);
-  const promo = useMemo(() => applyPromo([{ id: "cart", seq: 0, createdAt: "", bsc: lines }]), [lines]);
-  const hasPlato = lines.some((l) => l.promoEligible);
-  const hasTrago = lines.some((l) => l.promoTrigger);
-  const total = subtotal - promo.amount;
+  const total = subtotal;
+
+  // Cortesía: con N tragos de la casa en la cuenta (los de antes de este celular + los del carrito), una por persona.
+  const need = settings.cortesia.tragos;
+  const opts = cortesiaOptions(settings);
+  const samePerson = !!prior && prior.name === name.trim() && prior.phone === phone.trim();
+  const cartTragos = lines.reduce((t, l) => t + (l.promoTrigger ? l.qty : 0), 0);
+  const tragos = (samePerson ? prior!.tragos : 0) + cartTragos;
+  const given = samePerson ? prior!.cortesia : "";
+  const qualifies = tragos >= need;
+  const faltan = need - tragos;
+  // si el carrito ya no califica, se descarta la opción elegida
+  useEffect(() => {
+    if (!qualifies || given) setPick("");
+  }, [qualifies, given]);
 
   const bump = (key: string, d: number) =>
     setQty((q) => {
@@ -122,7 +137,10 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
           customerName: name.trim(),
           whatsapp: phone.trim(),
           table: table.trim(),
-          lines: lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),
+          lines: [
+            ...lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),
+            ...(pick && qualifies && !given ? [{ id: CORTESIA_ID, optionId: pick }] : []),
+          ],
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -135,10 +153,13 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         return;
       }
       try {
-        localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: name.trim(), phone: phone.trim(), table: table.trim() }));
+        const acct = d.account ? { name: name.trim(), phone: phone.trim(), tragos: d.account.tragos, cortesia: d.account.cortesia } : null;
+        if (acct) setPrior(acct);
+        localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: name.trim(), phone: phone.trim(), table: table.trim(), ...(acct ? { prior: acct } : {}) }));
       } catch {
         /* ignorar */
       }
+      setPick("");
       setReceipt({ id: d.order.id, lines: d.order.bsc, total: d.order.total, name: d.order.customerName, table: d.order.bscTable, account: d.account });
       setQty({});
       setTimeout(() => ticketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -179,7 +200,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         <p className="bsc-data">{datos}</p>
       </section>
 
-      <div className="bsc-promo" role="note">Primer plato para picar incluido con tu primer trago</div>
+      <div className="bsc-promo" role="note">Por {need} tragos, una cortesía de la casa</div>
 
       <main className="bsc-main">
         {BSC_CATS.map((cat) => {
@@ -260,13 +281,10 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
                 <div className="bsc-ticket-tot"><span>Este pedido</span><b>{crc(receipt.total)}</b></div>
                 {receipt.account && (
                   <>
-                    {receipt.account.promo.applied && (
-                      <div className="bsc-ticket-tot promo">
-                        <span>Incluido por promo: {receipt.account.promo.item}</span>
-                        <b>−{crc(receipt.account.promo.amount)}</b>
-                      </div>
-                    )}
                     <div className="bsc-ticket-tot"><span>Tu cuenta hasta ahora ({receipt.account.orders} {receipt.account.orders === 1 ? "pedido" : "pedidos"})</span><b>{crc(receipt.account.total)}</b></div>
+                    {receipt.account.qualifies && !receipt.account.cortesia && (
+                      <div className="bsc-ticket-tot promo"><span>¡Ya te ganaste tu cortesía! Pedila en tu próximo pedido.</span></div>
+                    )}
                   </>
                 )}
               </div>
@@ -297,17 +315,27 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
                   <span className="p">{crc(l.subtotal)}</span>
                 </li>
               ))}
-              {promo.applied && (
-                <li className="promo">
-                  <span className="t">Incluido por promo: {promo.item?.name}</span>
-                  <span className="p">−{crc(promo.amount)}</span>
-                </li>
-              )}
             </ul>
-            {hasPlato && !hasTrago && (
-              <p className="bsc-hint">Sumá un trago de la casa y tu primer plato para picar va incluido.</p>
-            )}
-            <p className="bsc-hint">Si ya pediste antes esta noche, la promo se calcula sobre toda tu cuenta.</p>
+            <div className="bsc-cortesia">
+              <div className="bsc-cortesia-h">Cortesía de la casa</div>
+              {given ? (
+                <p>Ya recibiste tu cortesía ({given}). Es una por persona.</p>
+              ) : qualifies ? (
+                <>
+                  <p>Te ganaste una cortesía. Elegí una:</p>
+                  <div className="opts" role="radiogroup" aria-label="Elegí tu cortesía">
+                    {opts.map((o) => (
+                      <button key={o.id} type="button" role="radio" aria-checked={pick === o.id} className={pick === o.id ? "on" : ""} onClick={() => setPick(pick === o.id ? "" : o.id)}>
+                        <b>{o.label}</b>
+                        {o.desc && <span>{o.desc}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p>Con {need} tragos de la casa en tu cuenta tenés una cortesía.{tragos > 0 ? ` Te ${faltan === 1 ? "falta 1 trago" : `faltan ${faltan} tragos`}.` : ""}</p>
+              )}
+            </div>
             <div className="bsc-total"><span>Total de este pedido</span><b>{crc(total)}</b></div>
 
             <div className="bsc-form">
@@ -342,7 +370,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         <div className="bsc-bar">
           <div>
             <b>{crc(total)}</b>
-            <span>{count} {count === 1 ? "ítem" : "ítems"}{promo.applied ? " · promo aplicada" : ""}</span>
+            <span>{count} {count === 1 ? "ítem" : "ítems"}{pick && qualifies && !given ? " · con cortesía" : ""}</span>
           </div>
           <button type="button" onClick={() => checkoutRef.current?.scrollIntoView({ behavior: "smooth" })}>Revisar pedido</button>
         </div>

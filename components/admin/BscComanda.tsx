@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { BscPay, BscPrep, BscSettings, Order } from "@/lib/types";
 import { crc } from "@/lib/format";
 import {
-  BSC_CATS, PAY_LABEL, PAY_METHODS, PREP_FLOW, PREP_LABEL, accountsCsv, buildAccounts, crTime, editionLabel, eventTotals, prepOf,
+  BSC_CATS, PAY_LABEL, PAY_METHODS, PREP_FLOW, PREP_LABEL, accountsCsv, buildAccounts, cortesiaLabel, crTime, editionLabel, eventTotals, prepOf,
   type BscAccount,
 } from "@/lib/bsc";
 import { BscCaptura, type CapturaPrefill } from "./BscCaptura";
@@ -153,7 +153,7 @@ export function BscComanda({
       <div className="editcard bsc-adm-prep">
         <h3>Qué preparar ahora</h3>
         <p className="sub">Lo pedido que todavía no se entregó, para la barra y la cocina.</p>
-        {toPrepare.length === 0 ? (
+        {toPrepare.length === 0 && totals.cortesias.pendientes === 0 ? (
           <div className="empty">Nada pendiente. ✓</div>
         ) : (
           <div className="bsc-adm-prep-grid">
@@ -174,6 +174,16 @@ export function BscComanda({
                 </div>
               );
             })}
+            {totals.cortesias.pendientes > 0 && (
+              <div className="cat cort">
+                <div className="h">Cortesías (las da el restaurante)</div>
+                <ul>
+                  {Object.entries(totals.cortesias.porOpcion).filter(([, v]) => v.pendientes > 0).sort(([a], [b]) => a.localeCompare(b)).map(([id, v]) => (
+                    <li key={id}><span>{cortesiaLabel(id)}</span><b>×{v.pendientes}</b></li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -214,6 +224,13 @@ export function BscComanda({
                 </div>
                 <div className="tot">
                   <span className={`pill ${a.paid ? "paid" : "pend"}`}>{a.paid ? `Pagada${a.pay ? ` · ${PAY_LABEL[a.pay]}` : ""}` : "Abierta"}</span>
+                  {a.cortesia ? (
+                    <span className={`pill ${a.tragos >= settings.cortesia.tragos ? "done" : "pend"}`} title={a.tragos >= settings.cortesia.tragos ? "Cortesía entregada" : `Se dio la cortesía con menos de ${settings.cortesia.tragos} tragos`}>
+                      Cortesía · {cortesiaLabel(a.cortesia.optionId)}{a.tragos >= settings.cortesia.tragos ? "" : " ⚠"}
+                    </span>
+                  ) : !readOnly && !a.paid && a.tragos >= settings.cortesia.tragos ? (
+                    <span className="pill paid">Cortesía disponible</span>
+                  ) : null}
                   <b className="tnum">{crc(a.total)}</b>
                 </div>
               </div>
@@ -297,7 +314,7 @@ export function BscComanda({
       <p className="wa-note" style={{ textAlign: "left", marginTop: 14 }}>
         Cada persona es una cuenta: mismo <b>teléfono</b>, o mismo nombre si no dejó teléfono. Tocá el estado de un pedido para avanzarlo
         (<b>recibido → en preparación → entregado</b>). <b>Cobrar cuenta</b> pide el método (efectivo, SINPE o tarjeta) y cierra todos sus pedidos; un pedido nuevo la vuelve a abrir.
-        Los pedidos del evento no usan cupos ni aparecen en Pedidos, Resumen cocina, Etiquetas ni en las métricas del menú semanal. Se actualiza solo cada 8 s.
+        La <b>cortesía</b> (Opción 1 u Opción 2, la da el restaurante) se registra en la <b>Nueva comanda</b> cuando la cuenta ya tiene {settings.cortesia.tragos} tragos; una por persona y no suma a las ventas. Los pedidos del evento no usan cupos ni aparecen en Pedidos, Resumen cocina, Etiquetas ni en las métricas del menú semanal. Se actualiza solo cada 8 s.
       </p>
     </>
   );
