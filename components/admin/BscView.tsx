@@ -59,11 +59,13 @@ export function BscView({ initial }: { initial: { orders: Order[]; settings: Bsc
     <>
       <div className={`bsc-adm-state ${state}`}>
         <span className="dot" aria-hidden="true" />
-        <span>
+        <span className="txt">
           <b>{settings.name} · {editionLabel(settings.editionId)}:</b> {STATE_TXT[state]}
           {!settings.enabled && " · interruptor APAGADO (sin pestaña ni pedidos de clientes)"}
-          {" · "}
-          {crDateTimeLabel(settings.availableFrom)} → {crDateTimeLabel(settings.availableUntil)} (hora de Costa Rica)
+          <span className="win">
+            {" · "}
+            {crDateTimeLabel(settings.availableFrom)} → {crDateTimeLabel(settings.availableUntil)} (hora de Costa Rica)
+          </span>
         </span>
         <a className="obtn" href="/bistro-social-club" target="_blank" rel="noopener noreferrer">Ver la página ↗</a>
       </div>
@@ -76,7 +78,7 @@ export function BscView({ initial }: { initial: { orders: Order[]; settings: Bsc
             </button>
           ))}
         </div>
-        {vista !== "carta" && (
+        {vista !== "carta" && options.length > 1 && (
           <div className="wtabs" style={{ margin: 0 }}>
             <DaySelect options={options} value={selected} onChange={setEdition} label="Edición" />
           </div>

@@ -5,6 +5,7 @@ import type { Order } from "@/lib/types";
 import { crc } from "@/lib/format";
 import { BSC_CATS, PAY_LABEL, buildAccounts, cortesiaLabel, crTime, editionLabel, editionsSummary, eventTotals, salesByHour } from "@/lib/bsc";
 
+const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 const cell = (v: string | number) => (/[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
 
 /** Tracking de la edición: lo facturado, lo cobrado (por método), lo que se vendió y salió, y cómo se movió la noche. */
@@ -26,6 +27,8 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
     for (const cat of BSC_CATS) {
       for (const i of t.items.filter((x) => x.cat === cat.id)) rows.push([cat.name, i.name, i.variantName || "", i.qty, i.delivered, i.pending, i.revenue]);
     }
+    rows.push([], ["Ingreso por categoría", "Unidades", "Bruto", "Promos", "Facturado", "Cobrado", "Por cobrar"]);
+    for (const c of t.cats) rows.push([c.name, c.qty, c.bruto, -c.promo, c.facturado, c.cobrado, c.porCobrar]);
     rows.push([], ["", "Bruto", "", "", "", "", t.bruto], ["", "Promos", "", "", "", "", -t.promoMonto], ["", "Facturado", "", "", "", "", t.ventas]);
     for (const [id, v] of Object.entries(t.cortesias.porOpcion).sort(([a], [b]) => a.localeCompare(b))) rows.push(["", `Cortesías · ${cortesiaLabel(id)}`, "", v.total, "", v.pendientes, 0]);
     rows.push(["", "Cobrado", "", "", "", "", t.cobrado], ["", "Por cobrar", "", "", "", "", t.porCobrar]);
@@ -70,6 +73,30 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
         <div className="box">
           <div className="k">Ticket promedio</div>
           <div className="v tnum">{crc(ticket)}</div>
+        </div>
+      </div>
+
+      <div className="editcard">
+        <h3>Ventas por categoría</h3>
+        <p className="sub">Lo facturado en cada rubro (ya con promos) y cuánto de eso ya se cobró. Las tres categorías suman el total facturado.</p>
+        <div className="bsc-adm-split" role="img" aria-label={t.cats.map((c) => `${c.name} ${pct(c.facturado, t.ventas)}%`).join(", ")}>
+          {t.cats.map((c) => (c.facturado > 0 ? <i key={c.cat} className={c.cat} style={{ flexGrow: c.facturado }} title={`${c.name}: ${crc(c.facturado)}`} /> : null))}
+        </div>
+        <div className="bsc-adm-cats">
+          {t.cats.map((c) => (
+            <div key={c.cat} className={`cat ${c.cat}`}>
+              <span className="k"><i aria-hidden="true" /> {c.name}</span>
+              <b className="v tnum">{crc(c.facturado)}</b>
+              <span className="p">{pct(c.facturado, t.ventas)}% del total · {c.qty} {c.qty === 1 ? "unidad" : "unidades"}</span>
+              <span className="p">Cobrado <b className="tnum">{crc(c.cobrado)}</b> · Por cobrar <b className="tnum">{crc(c.porCobrar)}</b></span>
+              {c.promo > 0 && <span className="p promo">Incluye −{crc(c.promo)} de promos (bruto {crc(c.bruto)})</span>}
+            </div>
+          ))}
+          <div className="cat sum">
+            <span className="k">Total facturado</span>
+            <b className="v tnum">{crc(t.ventas)}</b>
+            <span className="p">Cobrado <b className="tnum">{crc(t.cobrado)}</b> · Por cobrar <b className="tnum">{crc(t.porCobrar)}</b></span>
+          </div>
         </div>
       </div>
 
