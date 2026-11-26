@@ -446,6 +446,44 @@ assert.equal(buildAccounts([old1])[0].promo.amount, 3000);
   assert.ok(courtesyOf([mk("A", [trago(1)])], P.cortesia.tragos).qualifies);
 }
 
+// ═══ Ingreso por categoría: tragos / cerveza y vino / para picar ═══════════════
+{
+  const A = O("Cat Uno", "7666 0001", T0, [trago(2), plato("fondue", "Fondue", 1), cerveza(3), COR("1")], "pagado", "entregado"); // pagada
+  const B = O("Cat Dos", "7666 0002", T1, [playero(1), vino(), plato("hummus", "Hummus", 2)], "pendiente", "preparando"); // abierta
+  const legacy = O("Cat Vieja", "7666 0003", T2, [trago(1), plato()], "pendiente", "recibido");
+  // (los ayudantes de prueba marcan trago y plato como en la primera edición: cada cuenta recibe su plato incluido)
+  const accs = buildAccounts([A, B, legacy]);
+  const t = eventTotals(accs);
+  const byCat = Object.fromEntries(t.cats.map((c) => [c.cat, c]));
+  assert.deepEqual(t.cats.map((c) => c.cat), ["tragos", "bebidas", "picar"]); // siempre las tres, en el orden de la carta
+  assert.equal(byCat.tragos.bruto, 10000 + 5000 + 5000); // Gin ×2, Playero, Gin de la vieja
+  assert.equal(byCat.bebidas.bruto, 6000 + 3500); // 3 cervezas + 1 vino
+  assert.equal(byCat.picar.bruto, 3000 + 6000 + 3000); // fondue, 2 hummus, guacamole de la vieja
+  assert.equal(byCat.picar.promo, 3000 * 3); // el plato incluido de la primera edición descuenta de «para picar» (una vez por cuenta)
+  assert.equal(byCat.tragos.promo + byCat.bebidas.promo, 0);
+  // las tres categorías cuadran con los totales de siempre
+  const sumCats = (k: "bruto" | "promo" | "facturado" | "cobrado" | "porCobrar" | "qty") => t.cats.reduce((n, c) => n + c[k], 0);
+  assert.equal(sumCats("bruto"), t.bruto);
+  assert.equal(sumCats("promo"), t.promoMonto);
+  assert.equal(sumCats("facturado"), t.ventas);
+  assert.equal(sumCats("cobrado"), t.cobrado);
+  assert.equal(sumCats("porCobrar"), t.porCobrar);
+  assert.equal(sumCats("qty"), t.items.reduce((n, i) => n + i.qty, 0));
+  // cobrado solo de la cuenta pagada (Cat Uno): 10.000 de tragos, 6.000 de cerveza y su fondue salió incluido (₡0)
+  assert.deepEqual([byCat.tragos.cobrado, byCat.bebidas.cobrado, byCat.picar.cobrado], [10000, 6000, 0]);
+  assert.equal(byCat.picar.facturado, 12000 - 9000);
+  assert.ok(t.cats.every((c) => c.facturado === c.bruto - c.promo));
+  // la cortesía no suma a ninguna categoría
+  assert.equal(sumCats("bruto"), 10000 + 5000 + 5000 + 6000 + 3500 + 12000);
+  // pedidos nuevos (sin la promo vieja): facturado = bruto en cada categoría
+  const n1 = O("Cat Nueva", "7666 0004", T2, ok({ customerName: "Cat Nueva", lines: [gin(2), { id: "guacamole", qty: 2 }, { id: "cerveza", qty: 1 }] }).lines, "pagado", "entregado");
+  const tn = eventTotals(buildAccounts([n1]));
+  assert.deepEqual(tn.cats.map((c) => [c.cat, c.bruto, c.promo, c.facturado, c.cobrado]), [["tragos", 10000, 0, 10000, 10000], ["bebidas", 2000, 0, 2000, 2000], ["picar", 6000, 0, 6000, 6000]]);
+  assert.equal(tn.ventas, 18000);
+  // sin pedidos: las tres categorías en cero
+  assert.deepEqual(eventTotals([]).cats.map((c) => c.facturado), [0, 0, 0]);
+}
+
 console.log("bsc (cortesía y carpaccio): todos los tests OK");
 
 console.log("bsc: todos los tests OK");

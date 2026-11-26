@@ -403,6 +403,12 @@ export interface BscTotals {
   porMetodo: Record<BscPay | "sin", number>;
   /** Cortesías (las da el restaurante): cuántas se dieron por opción y cuántas faltan por entregar. No suman a las ventas. */
   cortesias: { total: number; pendientes: number; porOpcion: Record<string, { total: number; pendientes: number }> };
+  /**
+   * Ingreso por categoría (siempre las tres, en el orden de la carta): lo pedido, el bruto, la promo de la primera edición
+   * (descuenta de la categoría del plato regalado), lo facturado y cuánto de eso ya se cobró. Las cortesías no cuentan.
+   * Siempre cuadra: la suma de `facturado` = `ventas`, la de `cobrado` = `cobrado` y la de `porCobrar` = `porCobrar`.
+   */
+  cats: { cat: BscCatId; name: string; qty: number; bruto: number; promo: number; facturado: number; cobrado: number; porCobrar: number }[];
   /** Por ítem y variante: lo pedido, lo que salió (entregado), lo que falta y lo facturado en bruto. */
   items: { key: string; cat: BscCatId; name: string; variantName?: string; qty: number; delivered: number; pending: number; revenue: number }[];
 }
@@ -410,6 +416,8 @@ export interface BscTotals {
 export function eventTotals(accounts: BscAccount[]): BscTotals {
   const items = new Map<string, BscTotals["items"][number]>();
   const cortesias: BscTotals["cortesias"] = { total: 0, pendientes: 0, porOpcion: {} };
+  const cats: BscTotals["cats"] = BSC_CATS.map((c) => ({ cat: c.id, name: c.name, qty: 0, bruto: 0, promo: 0, facturado: 0, cobrado: 0, porCobrar: 0 }));
+  const catRow = (id: BscCatId) => cats.find((c) => c.cat === id) || cats[cats.length - 1];
   for (const a of accounts) {
     for (const o of a.orders) {
       const pend = prepOf(o) !== "entregado";
@@ -425,6 +433,12 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
           }
           continue;
         }
+        const row = catRow(l.cat as BscCatId);
+        row.qty += l.qty;
+        row.bruto += l.subtotal;
+        row.facturado += l.subtotal;
+        if (a.paid) row.cobrado += l.subtotal;
+        else row.porCobrar += l.subtotal;
         const key = `${l.id}:${l.variantId || ""}`;
         const cur = items.get(key) || { key, cat: l.cat as BscCatId, name: l.name, variantName: l.variantName, qty: 0, delivered: 0, pending: 0, revenue: 0 };
         cur.qty += l.qty;
@@ -434,6 +448,15 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
         items.set(key, cur);
       }
     }
+  }
+  for (const a of accounts) {
+    if (!a.promo.applied || a.promo.amount <= 0) continue;
+    const line = a.orders.find((o) => o.id === a.promo.item?.orderId)?.bsc?.[a.promo.item?.lineIndex ?? -1];
+    const row = catRow((line?.cat as BscCatId) || "picar");
+    row.promo += a.promo.amount;
+    row.facturado -= a.promo.amount;
+    if (a.paid) row.cobrado -= a.promo.amount;
+    else row.porCobrar -= a.promo.amount;
   }
   const sum = (f: (a: BscAccount) => number, pick: (a: BscAccount) => boolean = () => true) => accounts.filter(pick).reduce((t, a) => t + f(a), 0);
   const porMetodo: BscTotals["porMetodo"] = { efectivo: 0, sinpe: 0, tarjeta: 0, sin: 0 };
@@ -449,6 +472,7 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
     promoMonto: sum((a) => a.promo.amount),
     porMetodo,
     cortesias,
+    cats,
     items: [...items.values()].sort((a, b) => CAT_ORDER[a.cat] - CAT_ORDER[b.cat] || b.qty - a.qty || a.name.localeCompare(b.name)),
   };
 }

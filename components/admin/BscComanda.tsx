@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BscPay, BscPrep, BscSettings, Order } from "@/lib/types";
 import { crc } from "@/lib/format";
 import {
@@ -8,6 +8,11 @@ import {
   type BscAccount,
 } from "@/lib/bsc";
 import { BscCaptura, type CapturaPrefill } from "./BscCaptura";
+
+type Sec = "pend" | "cuentas" | "nueva" | "disp";
+const SEC_KEY = "sano:bsc:sec";
+const minsAgo = (iso: string) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000));
+const agoLabel = (m: number) => (m < 1 ? "recién" : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60} min`);
 
 type Filter = "todas" | "pendientes" | "abiertas";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -37,6 +42,38 @@ export function BscComanda({
   const [busy, setBusy] = useState("");
   const [payFor, setPayFor] = useState("");
   const [prefill, setPrefill] = useState<CapturaPrefill | null>(null);
+  const [sec, setSecState] = useState<Sec>(readOnly ? "cuentas" : "pend");
+  const [, setTick] = useState(0);
+
+  // lo último que se estaba usando se recuerda en este dispositivo (solo comodidad; sin eso arranca en «Pendientes»)
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(SEC_KEY) as Sec | null;
+      if (v && ["pend", "cuentas", "nueva", "disp"].includes(v)) setSecState(v);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 30000); // refresca el «hace N min»
+    return () => clearInterval(id);
+  }, []);
+  const navRef = useRef<HTMLElement>(null);
+  const setSec = (v: Sec) => {
+    setSecState(v);
+    // si la barra todavía no llegó arriba, se sube hasta ella: así la sección elegida queda a la vista sin scrollear a mano
+    requestAnimationFrame(() => {
+      const top = navRef.current?.getBoundingClientRect().top ?? 0;
+      if (top > 12) window.scrollTo({ top: window.scrollY + top - 8, behavior: "smooth" });
+    });
+    try {
+      localStorage.setItem(SEC_KEY, v);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+  const allowed: Sec[] = readOnly ? ["pend", "cuentas"] : ["pend", "nueva", "cuentas", "disp"];
+  const cur: Sec = allowed.includes(sec) ? sec : "cuentas";
 
   const accounts = useMemo(() => buildAccounts(orders), [orders]);
   const totals = useMemo(() => eventTotals(accounts), [accounts]);
@@ -45,6 +82,9 @@ export function BscComanda({
     [accounts, filter]
   );
   const toPrepare = totals.items.filter((i) => i.pending > 0);
+  // cola de preparación: cada pedido que todavía no se entregó, del más viejo al más nuevo
+  const queue = useMemo(() => orders.filter((o) => prepOf(o) !== "entregado").sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [orders]);
+  const agotados = settings.items.filter((i) => !i.active).length;
 
   const merge = (updated: Order[]) => onOrders((prev) => prev.map((o) => updated.find((u) => u.id === o.id) || o));
 
@@ -131,10 +171,92 @@ export function BscComanda({
     URL.revokeObjectURL(url);
   }
 
+  const tabs: { id: Sec; label: string; n?: number; hot?: boolean }[] = [
+    { id: "pend", label: "Pendientes", n: queue.length, hot: queue.length > 0 },
+    ...(readOnly ? [] : [{ id: "nueva" as Sec, label: "+ Nueva comanda" }]),
+    { id: "cuentas", label: "Cuentas", n: totals.abiertas },
+    ...(readOnly ? [] : [{ id: "disp" as Sec, label: "Agotados", n: agotados }]),
+  ];
+
   return (
     <>
+      <nav className="bsc-sub" ref={navRef} aria-label="Secciones de la comanda">
+        {tabs.map((t) => (
+          <button key={t.id} type="button" className={`${cur === t.id ? "on" : ""}${t.hot ? " hot" : ""}`} aria-pressed={cur === t.id} onClick={() => setSec(t.id)}>
+            {t.label}
+            {t.n !== undefined && t.n > 0 ? <span className="n">{t.n}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      <section hidden={cur !== "pend"} aria-label="Pendientes de preparar">
+        {queue.length === 0 && totals.cortesias.pendientes === 0 ? (
+          <div className="otable"><div className="empty" style={{ padding: 24 }}>Nada pendiente. ✓</div></div>
+        ) : (
+          <>
+            <div className="bsc-q">
+              {queue.map((o) => {
+                const prep = prepOf(o);
+                const m = minsAgo(o.createdAt);
+                return (
+                  <article className={`bsc-q-card ${prep}${m >= 15 ? " late" : ""}`} key={o.id}>
+                    <div className="top">
+                      <div>
+                        <h3>{o.customerName}{o.bscTable ? <span className="tbl"> · {o.bscTable}</span> : null}</h3>
+                        <p>{o.id} · {crTime(o.createdAt)} · <b>{agoLabel(m)}</b>{o.bscBy === "staff" ? " · staff" : ""}</p>
+                      </div>
+                      {prep !== "recibido" && (
+                        <button type="button" className="obtn" onClick={() => setPrep(o, prevPrep(prep))} disabled={busy === o.id} aria-label={`Volver ${o.id} a ${PREP_LABEL[prevPrep(prep)]}`}>↺</button>
+                      )}
+                    </div>
+                    <ul>
+                      {(o.bsc || []).map((l, i) => (
+                        <li key={i} className={l.cat === "cortesia" ? "cort" : ""}>
+                          <b>{l.qty}×</b> {l.cat === "cortesia" ? `${l.name} (la da el restaurante)` : `${l.name}${l.variantName ? ` · ${l.variantName}` : ""}`}
+                        </li>
+                      ))}
+                    </ul>
+                    <button type="button" className={`go ${prep}`} onClick={() => setPrep(o, nextPrep(prep))} disabled={busy === o.id} aria-label={`${o.id}: pasar a ${PREP_LABEL[nextPrep(prep)]}`}>
+                      {prep === "recibido" ? "Empezar a preparar →" : "Marcar entregado ✓"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="bsc-q-sum" aria-label="Totales por ítem para la barra y la cocina">
+              <span className="t">Totales por ítem</span>
+              {BSC_CATS.map((cat) => {
+                const rows = toPrepare.filter((i) => i.cat === cat.id);
+                return rows.length ? (
+                  <div className="g" key={cat.id}>
+                    <span className="h">{cat.name}</span>
+                    {rows.map((i) => (
+                      <span className="c" key={i.key}>{i.name}{i.variantName ? ` · ${i.variantName}` : ""} <b>×{i.pending}</b></span>
+                    ))}
+                  </div>
+                ) : null;
+              })}
+              {totals.cortesias.pendientes > 0 && (
+                <div className="g cort">
+                  <span className="h">Cortesías</span>
+                  {Object.entries(totals.cortesias.porOpcion).filter(([, v]) => v.pendientes > 0).sort(([a], [b]) => a.localeCompare(b)).map(([id, v]) => (
+                    <span className="c" key={id}>{cortesiaLabel(id)} <b>×{v.pendientes}</b></span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
       {!readOnly && (
-        <>
+        <section hidden={cur !== "nueva"} aria-label="Nueva comanda">
+          <BscCaptura settings={settings} accounts={accounts} prefill={prefill} onCreated={refetch} />
+        </section>
+      )}
+
+      {!readOnly && (
+        <section hidden={cur !== "disp"} aria-label="Disponibilidad">
           <div className="editcard bsc-avail">
             <h3>Disponibilidad</h3>
             <p className="sub">Tocá un ítem para marcarlo <b>agotado</b>; tocalo de nuevo para reponerlo. Los agotados no se ven en la página de los clientes.</p>
@@ -146,48 +268,10 @@ export function BscComanda({
               ))}
             </div>
           </div>
-          <BscCaptura settings={settings} accounts={accounts} prefill={prefill} onCreated={refetch} />
-        </>
+        </section>
       )}
 
-      <div className="editcard bsc-adm-prep">
-        <h3>Qué preparar ahora</h3>
-        <p className="sub">Lo pedido que todavía no se entregó, para la barra y la cocina.</p>
-        {toPrepare.length === 0 && totals.cortesias.pendientes === 0 ? (
-          <div className="empty">Nada pendiente. ✓</div>
-        ) : (
-          <div className="bsc-adm-prep-grid">
-            {BSC_CATS.map((cat) => {
-              const rows = toPrepare.filter((i) => i.cat === cat.id);
-              if (!rows.length) return null;
-              return (
-                <div className="cat" key={cat.id}>
-                  <div className="h">{cat.name}</div>
-                  <ul>
-                    {rows.map((i) => (
-                      <li key={i.key}>
-                        <span>{i.name}{i.variantName ? ` · ${i.variantName}` : ""}</span>
-                        <b>×{i.pending}</b>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-            {totals.cortesias.pendientes > 0 && (
-              <div className="cat cort">
-                <div className="h">Cortesías (las da el restaurante)</div>
-                <ul>
-                  {Object.entries(totals.cortesias.porOpcion).filter(([, v]) => v.pendientes > 0).sort(([a], [b]) => a.localeCompare(b)).map(([id, v]) => (
-                    <li key={id}><span>{cortesiaLabel(id)}</span><b>×{v.pendientes}</b></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
+      <section hidden={cur !== "cuentas"} aria-label="Cuentas">
       <div className="bsc-adm-bar">
         <div className="bsc-adm-filters" role="group" aria-label="Filtrar cuentas">
           {FILTERS.map((f) => (
@@ -297,7 +381,10 @@ export function BscComanda({
                       <button
                         type="button"
                         className="bsc-adm-pay undo"
-                        onClick={() => setPrefill({ name: a.name, phone: a.whatsapp, table: a.table, nonce: Date.now() })}
+                        onClick={() => {
+                          setPrefill({ name: a.name, phone: a.whatsapp, table: a.table, nonce: Date.now() });
+                          setSec("nueva");
+                        }}
                       >
                         + Pedido
                       </button>
@@ -316,6 +403,7 @@ export function BscComanda({
         (<b>recibido → en preparación → entregado</b>). <b>Cobrar cuenta</b> pide el método (efectivo, SINPE o tarjeta) y cierra todos sus pedidos; un pedido nuevo la vuelve a abrir.
         La <b>cortesía</b> (Opción 1 u Opción 2, la da el restaurante) se registra en la <b>Nueva comanda</b> cuando la cuenta ya tiene {settings.cortesia.tragos} tragos; una por persona y no suma a las ventas. Los pedidos del evento no usan cupos ni aparecen en Pedidos, Resumen cocina, Etiquetas ni en las métricas del menú semanal. Se actualiza solo cada 8 s.
       </p>
+      </section>
     </>
   );
 }

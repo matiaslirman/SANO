@@ -120,11 +120,17 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
   cambia con el botón **"Empezar la próxima edición (+7 días)"** (mueve evento y ventana una semana, mismas horas; `nextEditionPatch`), no al editar
   fechas. La edición anterior queda consultable en el selector "Edición" y en la tabla de ediciones de Ventas.
 - **Plataforma del staff** (`/admin/bsc`, pestaña "Bistro Social Club" mientras el interruptor esté encendido; `BscView.tsx` con tres vistas):
-  - **Comanda** (`BscComanda.tsx`): **Disponibilidad** (un toque marca un ítem *agotado*; desaparece al instante de la página de los clientes),
-    **Nueva comanda** (`BscCaptura.tsx`: el equipo carga lo que pide cada persona; mismo servidor y mismos precios; la cortesía se mira sobre la cuenta
-    completa; "+ Pedido" en una cuenta la precarga), **Qué preparar ahora**, cuentas por persona con estado de cada pedido (un toque avanza),
-    **Cobrar cuenta** (pide el método: efectivo, SINPE o tarjeta; guarda método y hora) / Reabrir, filtros, CSV e imprimir.
-  - **Ventas** (`BscVentas.tsx`): **Facturado** (= suma de totales de las cuentas, ya con promos), Cobrado, Por cobrar, ticket promedio, **cobrado por método**
+  - **Comanda** (`BscComanda.tsx`): una **barra fija** (`.bsc-sub`, queda pegada arriba al scrollear) con cuatro secciones que se muestran de a una, para no
+    scrollear: **Pendientes** (por defecto; cola de **pedidos** sin entregar, del más viejo al más nuevo, con «hace N min», mesa, líneas y un botón grande
+    «Empezar a preparar → / Marcar entregado ✓»; debajo, los totales por ítem para barra y cocina), **+ Nueva comanda** (`BscCaptura.tsx`: el equipo carga lo
+    que pide cada persona; mismo servidor y mismos precios; la cortesía se mira sobre la cuenta completa; "+ Pedido" en una cuenta cambia a esta sección y la
+    precarga; el carrito sigue montado aunque se cambie de sección), **Cuentas** (por persona, con estado de cada pedido; **Cobrar cuenta** pide el método:
+    efectivo, SINPE o tarjeta; guarda método y hora; Reabrir, filtros, CSV e imprimir) y **Agotados** (un toque marca un ítem *agotado*; desaparece al instante
+    de la página de los clientes). La sección activa se recuerda en el dispositivo (`localStorage sano:bsc:sec`). En celular el encabezado del panel se compacta
+    (pestañas en una fila deslizable) para que la cola quede a la vista; el selector de edición solo aparece si hay más de una.
+  - **Ventas** (`BscVentas.tsx`): **Facturado** (= suma de totales de las cuentas, ya con promos), Cobrado, Por cobrar, ticket promedio, **ventas por categoría**
+    (`eventTotals().cats`: tragos / cerveza y vino / para picar, cada una con facturado, % del total, unidades, cobrado y por cobrar; la promo vieja de la primera
+    edición se descuenta de «para picar»; **las tres suman siempre** facturado, cobrado y por cobrar; también va en el CSV), **cobrado por método**
     (para cuadrar la caja), tabla **"Lo vendido y lo que salió"** por ítem (pedidos / salió = entregado / falta / ingreso) que **cuadra siempre**:
     bruto − promos = facturado, y los métodos suman lo cobrado; ventas por hora (hora CR, cruza la medianoche); resumen por edición; CSV.
   - **Carta y edición** (`BscEditor.tsx`): **agregar, quitar y ordenar platos y bebidas** (categorías fijas: tragos, cerveza y vino, para picar), precios,
