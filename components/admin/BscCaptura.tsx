@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BscSettings, OrderBscLine } from "@/lib/types";
-import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, accountKey, cortesiaLabel, courtesyOf, unitPrice, type BscAccount } from "@/lib/bsc";
+import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, accountKey, comboAmount, cortesiaLabel, courtesyOf, unitPrice, type BscAccount } from "@/lib/bsc";
 import { crc } from "@/lib/format";
 
 const cartKey = (id: string, variantId?: string) => `${id}:${variantId || ""}`;
@@ -75,6 +75,12 @@ export function BscCaptura({
   const match = key ? accounts.find((a) => a.key === key) : undefined;
   // Cortesía (la da el restaurante): se mira sobre toda la cuenta de esa persona, con lo que ya pidió y lo que lleva en este pedido.
   const need = settings.cortesia.tragos;
+  // Promo por pares: el descuento de ESTE pedido cuenta los tragos que la persona ya tenía en su cuenta.
+  const comboCfg = settings.combo.enabled ? { qty: settings.combo.qty, price: settings.combo.price } : undefined;
+  const discount = useMemo(() => {
+    const prior = (match?.orders || []).flatMap((o) => o.bsc || []);
+    return comboCfg ? comboAmount([...prior, ...lines], comboCfg).amount - comboAmount(prior, comboCfg).amount : 0;
+  }, [match, lines, comboCfg?.qty, comboCfg?.price]); // eslint-disable-line react-hooks/exhaustive-deps
   const cs = useMemo(() => courtesyOf([...(match?.orders || []), { id: "nuevo", bsc: lines }], need), [match, lines, need]);
   const given = cs.given && cs.given.orderId !== "nuevo" ? cs.given : undefined;
   const canGive = cs.qualifies && !given;
@@ -241,7 +247,10 @@ export function BscCaptura({
           {cort && canGive && (
             <div className="ln promo"><span className="t">Cortesía · {cortesiaLabel(cort)}</span><span className="p">₡0</span></div>
           )}
-          <div className="tot"><span>{count} {count === 1 ? "ítem" : "ítems"}</span><b>{crc(subtotal)}</b></div>
+          {discount > 0 && (
+            <div className="ln promo"><span className="t">Promo {settings.combo.qty} tragos por {crc(settings.combo.price)}</span><span className="p">−{crc(discount)}</span></div>
+          )}
+          <div className="tot"><span>{count} {count === 1 ? "ítem" : "ítems"}</span><b>{crc(subtotal - discount)}</b></div>
         </div>
       )}
 

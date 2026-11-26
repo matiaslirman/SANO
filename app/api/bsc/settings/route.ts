@@ -30,6 +30,8 @@ export async function PATCH(req: Request) {
   if (typeof body.availableUntil === "string") patch.availableUntil = body.availableUntil;
   if (Array.isArray(body.items)) patch.items = body.items;
   if (body.cortesia && typeof body.cortesia === "object") patch.cortesia = body.cortesia;
+  if (body.combo && typeof body.combo === "object") patch.combo = body.combo;
+  if (typeof body.autoWeekly === "boolean") patch.autoWeekly = body.autoWeekly;
   const settings = await store.saveBsc(patch);
   return NextResponse.json({ settings });
 }

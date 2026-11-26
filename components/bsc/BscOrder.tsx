@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { BscItem, BscSettings, OrderBscLine } from "@/lib/types";
-import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, cortesiaOptions, crDateTimeLabel, priceLabel, unitPrice } from "@/lib/bsc";
+import { BSC_CATS, CORTESIA_ID, MAX_QTY_PER_LINE, comboAmount, cortesiaOptions, crDateTimeLabel, priceLabel, unitPrice } from "@/lib/bsc";
 import { crc } from "@/lib/format";
 
 const CONTACT_KEY = "sano:bsc:contact";
@@ -12,6 +12,8 @@ interface Receipt {
   id: string;
   lines: OrderBscLine[];
   total: number;
+  /** Lo que descuenta la promo por pares en este pedido (lo calcula el servidor). */
+  discount: number;
   name: string;
   table?: string;
   account?: { orders: number; subtotal: number; total: number; tragos: number; qualifies: boolean; cortesia: string };
@@ -96,7 +98,6 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
 
   const subtotal = lines.reduce((t, l) => t + l.subtotal, 0);
   const count = lines.reduce((t, l) => t + l.qty, 0);
-  const total = subtotal;
 
   // Cortesía: con N tragos de la casa en la cuenta (los de antes de este celular + los del carrito), una por persona.
   const need = settings.cortesia.tragos;
@@ -105,6 +106,17 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
   const cartTragos = lines.reduce((t, l) => t + (l.promoTrigger ? l.qty : 0), 0);
   const tragos = (samePerson ? prior!.tragos : 0) + cartTragos;
   const given = samePerson ? prior!.cortesia : "";
+
+  // Promo por pares de tragos de la casa: el descuento de ESTE pedido cuenta los tragos que la persona ya tenía (estimado en el
+  // celular; el servidor recalcula y el comprobante muestra el monto que vale).
+  const comboCfg = settings.combo.enabled ? { qty: settings.combo.qty, price: settings.combo.price } : undefined;
+  const houseDrinks = items.filter((i) => i.promoTrigger);
+  const drinkPrices = [...new Set(houseDrinks.map((i) => unitPrice(i)))];
+  const priorLines: OrderBscLine[] = samePerson && prior!.tragos > 0 && houseDrinks.length
+    ? [{ id: "previo", cat: "tragos", name: "previo", qty: prior!.tragos, unitPrice: Math.min(...houseDrinks.map((i) => unitPrice(i))), subtotal: 0, promoTrigger: true }]
+    : [];
+  const discount = comboCfg ? comboAmount([...priorLines, ...lines], comboCfg).amount - comboAmount(priorLines, comboCfg).amount : 0;
+  const total = subtotal - discount;
   const qualifies = tragos >= need;
   const faltan = need - tragos;
   // si el carrito ya no califica, se descarta la opción elegida
@@ -160,7 +172,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         /* ignorar */
       }
       setPick("");
-      setReceipt({ id: d.order.id, lines: d.order.bsc, total: d.order.total, name: d.order.customerName, table: d.order.bscTable, account: d.account });
+      setReceipt({ id: d.order.id, lines: d.order.bsc, total: d.order.total, discount: d.order.discount || 0, name: d.order.customerName, table: d.order.bscTable, account: d.account });
       setQty({});
       setTimeout(() => ticketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch {
@@ -200,7 +212,12 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
         <p className="bsc-data">{datos}</p>
       </section>
 
-      <div className="bsc-promo" role="note">{need === 1 ? "Con tu primer trago, una cortesía de la casa" : `Por ${need} tragos, una cortesía de la casa`}</div>
+      <div className="bsc-promo" role="note">
+        {settings.combo.enabled && (
+          <span className="l">{drinkPrices.length === 1 ? `1 trago ${crc(drinkPrices[0])} · ` : ""}{settings.combo.qty} por {crc(settings.combo.price)}</span>
+        )}
+        <span className="l">{need === 1 ? "Con tu primer trago, una cortesía de la casa" : `Por ${need} tragos, una cortesía de la casa`}</span>
+      </div>
 
       <main className="bsc-main">
         {BSC_CATS.map((cat) => {
@@ -278,7 +295,10 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
                     </li>
                   ))}
                 </ul>
-                <div className="bsc-ticket-tot"><span>Este pedido</span><b>{crc(receipt.total)}</b></div>
+                {receipt.discount > 0 && (
+                  <div className="bsc-ticket-tot promo"><span>Promo {settings.combo.qty} tragos por {crc(settings.combo.price)}</span><b>−{crc(receipt.discount)}</b></div>
+                )}
+                <div className="bsc-ticket-tot"><span>Este pedido</span><b>{crc(receipt.total - receipt.discount)}</b></div>
                 {receipt.account && (
                   <>
                     <div className="bsc-ticket-tot"><span>Tu cuenta hasta ahora ({receipt.account.orders} {receipt.account.orders === 1 ? "pedido" : "pedidos"})</span><b>{crc(receipt.account.total)}</b></div>
@@ -336,6 +356,7 @@ export function BscOrder({ settings, preview }: { settings: BscSettings; preview
                 <p>{need === 1 ? "Sumá un trago de la casa y te llevás una cortesía." : `Con ${need} tragos de la casa en tu cuenta tenés una cortesía.${tragos > 0 ? ` Te ${faltan === 1 ? "falta 1 trago" : `faltan ${faltan} tragos`}.` : ""}`}</p>
               )}
             </div>
+            {discount > 0 && <div className="bsc-total bsc-disc"><span>Promo {settings.combo.qty} tragos por {crc(settings.combo.price)}</span><b>−{crc(discount)}</b></div>}
             <div className="bsc-total"><span>Total de este pedido</span><b>{crc(total)}</b></div>
 
             <div className="bsc-form">

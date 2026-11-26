@@ -106,6 +106,18 @@ cliente** (`public/bsc/logos`): nunca escribir "Bistro Social Club" como texto c
   staff la registra en **Nueva comanda** (también como pedido aparte, cuando la cuenta ya calificó: la cuenta muestra «Cortesía disponible»). Ventas la cuenta
   aparte (`eventTotals().cortesias`: por opción, entregadas y por entregar) y **no la mezcla con los platos vendidos**. Cobertura del costo y reparto con el
   restaurante: decisión pendiente (ver "Reparto").
+- **Promo por pares** (`BscSettings.combo` = `{enabled, qty: 2, price: 9000}`; `comboAmount` / `comboOf` en `lib/bsc.ts`): «1 trago ₡5.000 o **2 por ₡9.000**».
+  Cada `qty` tragos de la casa (`promoTrigger`; **cerveza, vino y cortesía no**) de la cuenta de una persona valen `price`, **por cada par** (3 = ₡14.000, 4 = ₡18.000),
+  mezclando tragos; se calcula sobre **todos sus pedidos de la edición**. **No cambia el precio de las líneas ni `order.total`** (siempre bruto): el descuento
+  vive a nivel de cuenta (`BscAccount.combo`, `total = subtotal − promo vieja − combo`) y en `eventTotals` (`combos`, `comboMonto`; **bruto − promoMonto −
+  comboMonto = ventas**; cae en la categoría «tragos» de `cats`). Cada pedido guarda la promo vigente (`bscCombo`) para que cambiarla después no reescriba lo
+  anterior; los pedidos sin ella no descuentan. `checkBscOrder` devuelve `discount` (lo de ESTE pedido, contando los tragos que la persona ya tenía): la página
+  del cliente y «Nueva comanda» lo muestran, y el comprobante usa el del servidor. Se edita en Carta y edición → «Promo de tragos». **No hay trago de
+  bienvenida**: la invitación de la casa es la cortesía (Opción 1/2) por el primer trago.
+- **Apertura semanal automática** (`BscSettings.autoWeekly`, por defecto **sí**; `rollEdition` en `lib/bsc.ts`, aplicada al leer en `store.getBsc` y guardada):
+  24 h después de que termina la ventana, la edición y la ventana avanzan de a 7 días (mismas horas) hasta la vigente; la carta, la promo y la cortesía se
+  quedan como están. Abre sola el jueves a las 00:00. Entre el cierre y el siguiente jueves la página responde 404 (estado «todavía no abre»). Lo que se marcó
+  *agotado* no se repone solo (es el mismo campo `active` que «Visible»). «Empezar la próxima edición (+7 días)» sigue sirviendo para adelantarla a mano.
 - **Primera edición (19/11)**: la regla era «primer plato para picar incluido con el primer trago» (`applyPromo`, con `promoEligible`/`promoTrigger` guardados en cada
   línea). **Se conserva solo para leer esos pedidos** (sus totales no cambian); los pedidos nuevos ya no guardan `promoEligible` (`applyPromo` da ₡0 para ellos).
 - **Cuenta por persona** (`accountKey`/`buildAccounts`): mismo teléfono (últimos 8 dígitos) = misma persona; sin teléfono, mismo nombre exacto
