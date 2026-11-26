@@ -163,3 +163,9 @@ body:has(.bsc){background:#ECEBE6}
 .bsc-cortesia .opts button.on{background:var(--bsc-blue);color:var(--bsc-paper)}
 .bsc-cortesia .opts button.on span{color:var(--bsc-paper)}
 @media(max-width:600px){.bsc-cortesia .opts{grid-template-columns:1fr}}
+
+.bsc-promo .l{display:block}
+.bsc-total.bsc-disc{border-top:0;margin-top:8px;padding-top:0;font-size:14px}
+.bsc-total.bsc-disc b{font-size:16px}
+.bsc-promo .l+.l{margin-top:4px}
+.bsc-promo .l:first-child:not(:last-child){font-size:.86em;white-space:nowrap}

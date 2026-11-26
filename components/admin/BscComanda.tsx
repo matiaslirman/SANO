@@ -362,6 +362,7 @@ export function BscComanda({
                 <div className="sum">
                   <span>Subtotal <b className="tnum">{crc(a.subtotal)}</b></span>
                   {a.promo.applied && <span className="promo">Promo ({a.promo.item?.name}) <b className="tnum">−{crc(a.promo.amount)}</b></span>}
+                  {a.combo.amount > 0 && <span className="promo">Promo {a.combo.qty} tragos por {crc(a.combo.price)} ({a.combo.bundles} {a.combo.bundles === 1 ? "par" : "pares"}) <b className="tnum">−{crc(a.combo.amount)}</b></span>}
                   <span>Total <b className="tnum">{crc(a.total)}</b></span>
                   {a.paid && a.paidAt && <span>Cobrada a las {crTime(a.paidAt)}</span>}
                 </div>

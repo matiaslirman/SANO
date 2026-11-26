@@ -114,6 +114,7 @@ export interface Order {
   bscEdition?: string;       // bsc: edición del evento (fecha CR del evento, AAAA-MM-DD); sin dato = primera edición
   bscBy?: "cliente" | "staff"; // bsc: quién lo cargó (el cliente desde su celular o el staff desde el panel)
   bscPay?: BscPay;           // bsc: método con el que se cobró la cuenta
+  bscCombo?: { qty: number; price: number }; // bsc: promo por pares vigente cuando se hizo el pedido (así cada pedido conserva la suya)
   bscPaidAt?: string;        // bsc: cuándo se cobró (ISO)
 }
 
@@ -237,6 +238,12 @@ export interface BscCortesiaOption {
   desc?: string;
 }
 
+/** Promo por pares: `qty` tragos de la casa por `price` (p. ej. 2 por ₡9.000). */
+export interface BscCombo {
+  qty: number;
+  price: number;
+}
+
 export interface BscSettings {
   /** Interruptor general: apagado, no hay pestaña, ni página, ni pedidos (la comanda del panel sí queda). */
   enabled: boolean;
@@ -251,6 +258,10 @@ export interface BscSettings {
   items: BscItem[];
   /** Regalía por consumo: con `tragos` tragos de la casa en la cuenta, una cortesía (Opción 1 u Opción 2) por persona. */
   cortesia: { tragos: number; options: BscCortesiaOption[] };
+  /** Promo por pares de tragos de la casa (cada `qty` tragos valen `price`; el que sobra, su precio normal). */
+  combo: BscCombo & { enabled: boolean };
+  /** Cada semana la edición y la ventana de pedidos avanzan solas (+7 días) cuando termina la ventana. */
+  autoWeekly: boolean;
 }
 
 /** Línea de un pedido del evento: con el precio del momento (el servidor es la autoridad). */

@@ -3,7 +3,7 @@
  * promo por persona, cuentas de la comanda y exportación. Todo en hora de Costa Rica (UTC−6, sin horario de verano).
  * El servidor es la autoridad: del cliente solo se leen ids, variantes y cantidades; el precio sale de la carta.
  */
-import type { BscCatId, BscCortesiaOption, BscItem, BscPay, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
+import type { BscCatId, BscCombo, BscCortesiaOption, BscItem, BscPay, BscPrep, BscSettings, BscVariant, Order, OrderBscLine } from "./types";
 import { crc } from "./format";
 
 export const BSC_CATS: { id: BscCatId; name: string; sub?: string }[] = [
@@ -121,6 +121,21 @@ export function nextEditionPatch(s: Pick<BscSettings, "startsAt" | "availableFro
   return { editionId: crDate(startsAt), startsAt, availableFrom: shiftIso(s.availableFrom, days), availableUntil: shiftIso(s.availableUntil, days) };
 }
 
+/**
+ * Apertura semanal automática: cuando la ventana terminó hace más de `ROLL_GRACE_HOURS`, la edición y la ventana avanzan
+ * de a 7 días hasta que la ventana vigente no haya terminado (mismas horas, el próximo jueves). El margen deja el viernes
+ * para cobrar y ver la edición que acaba de pasar como la «en curso». Con `autoWeekly` apagado no cambia nada.
+ */
+export const ROLL_GRACE_HOURS = 24;
+export function rollEdition<T extends Pick<BscSettings, "autoWeekly" | "editionId" | "startsAt" | "availableFrom" | "availableUntil">>(s: T, now: Date = new Date()): T {
+  if (!s.autoWeekly) return s;
+  let cur = s;
+  for (let i = 0; i < 104 && Date.parse(cur.availableUntil) + ROLL_GRACE_HOURS * 3600_000 <= now.getTime(); i++) {
+    cur = { ...cur, ...nextEditionPatch(cur, 7) };
+  }
+  return cur;
+}
+
 /** Id estable a partir de un nombre («Mojito de maracuyá» → «mojito-de-maracuya»), sin repetir los ya usados. */
 export function slugId(name: string, taken: Iterable<string>): string {
   const used = new Set(taken);
@@ -198,10 +213,57 @@ export function courtesyOf(orders: Pick<Order, "id" | "bsc">[], min: number): Co
   return { tragos, qualifies: tragos >= Math.max(1, min), ...(given ? { given } : {}) };
 }
 
+// ── Promo por pares: «1 trago ₡5.000 o 2 por ₡9.000» ─────────────────────
+
+export const COMBO_DEFAULT: BscCombo = { qty: 2, price: 9000 };
+type ComboLine = Pick<OrderBscLine, "qty" | "unitPrice" | "promoTrigger" | "cat" | "id">;
+
+/**
+ * Descuento de la promo por pares sobre un conjunto de líneas. Solo cuentan los tragos de la casa (`promoTrigger`; cerveza y
+ * vino no, tampoco la cortesía). Se arman grupos de `qty` tragos —de los más caros a los más baratos— y cada grupo completo
+ * vale `price` (si eso es menos que la suma); el trago que sobra paga su precio normal. 2 → ₡9.000, 3 → ₡14.000, 4 → ₡18.000.
+ */
+export function comboAmount(lines: ComboLine[], cfg: BscCombo | undefined): { bundles: number; amount: number } {
+  if (!cfg || cfg.qty < 2) return { bundles: 0, amount: 0 };
+  const units: number[] = [];
+  for (const l of lines) {
+    if (l.cat === "cortesia" || l.id === CORTESIA_ID || !l.promoTrigger || l.qty <= 0) continue;
+    for (let i = 0; i < l.qty; i++) units.push(l.unitPrice);
+  }
+  units.sort((a, b) => b - a);
+  let bundles = 0;
+  let amount = 0;
+  for (let i = 0; i + cfg.qty <= units.length; i += cfg.qty) {
+    const sum = units.slice(i, i + cfg.qty).reduce((t, v) => t + v, 0);
+    if (sum > cfg.price) {
+      bundles += 1;
+      amount += sum - cfg.price;
+    }
+  }
+  return { bundles, amount };
+}
+
+/** La promo vigente de una cuenta: la del pedido más reciente que la traía (los pedidos viejos, sin promo, igual suman sus tragos). */
+export function comboOf(orders: Pick<Order, "bsc" | "bscCombo" | "createdAt" | "seq">[]): { bundles: number; amount: number; qty: number; price: number } {
+  const chrono = [...orders].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.seq - b.seq);
+  const cfg = [...chrono].reverse().find((o) => o.bscCombo)?.bscCombo;
+  if (!cfg) return { bundles: 0, amount: 0, qty: 0, price: 0 };
+  const r = comboAmount(chrono.flatMap((o) => o.bsc || []), cfg);
+  return { ...r, qty: cfg.qty, price: cfg.price };
+}
+
 // ── Validación del pedido (autoridad del servidor) ──────────
 
 export type BscOrderCheck =
-  | { ok: true; name: string; whatsapp: string; table: string; notes: string; lines: OrderBscLine[]; total: number }
+  | {
+      ok: true; name: string; whatsapp: string; table: string; notes: string; lines: OrderBscLine[];
+      /** Suma de las líneas (antes de la promo por pares). */
+      total: number;
+      /** Lo que la promo por pares descuenta POR ESTE pedido (sumando los tragos que la persona ya tenía en la edición). */
+      discount: number;
+      /** La promo vigente, para guardarla en el pedido. */
+      combo?: BscCombo;
+    }
   | { ok: false; error: string; code: "closed" | "invalid" };
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -282,7 +344,17 @@ export function checkBscOrder(
     notes: str(input.notes, 300),
     lines,
     total: lines.reduce((t, l) => t + l.subtotal, 0),
+    ...comboDiscount(lines, s, opts.accountOrders),
   };
+}
+
+/** Descuento de este pedido = lo que descuenta la cuenta con el pedido menos lo que ya descontaba sin él. */
+function comboDiscount(lines: OrderBscLine[], s: BscSettings, before: Pick<Order, "bsc">[] = []): { discount: number; combo?: BscCombo } {
+  if (!s.combo?.enabled) return { discount: 0 };
+  const cfg: BscCombo = { qty: s.combo.qty, price: s.combo.price };
+  const prior = before.flatMap((o) => o.bsc || []);
+  const discount = comboAmount([...prior, ...lines], cfg).amount - comboAmount(prior, cfg).amount;
+  return { discount, combo: cfg };
 }
 
 // ── Promo de la PRIMERA edición: «Primer plato para picar incluido con tu primer trago» (solo para leer esos pedidos) ──
@@ -334,6 +406,8 @@ export interface BscAccount {
   orders: Order[];
   subtotal: number;
   promo: PromoResult;
+  /** Promo por pares de tragos (cuántos pares y cuánto descuenta en total). */
+  combo: { bundles: number; amount: number; qty: number; price: number };
   total: number;
   /** Cuenta pagada = todos sus pedidos pagados; un pedido nuevo la vuelve a abrir sola. */
   paid: boolean;
@@ -363,6 +437,7 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
     const chrono = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.seq - b.seq);
     const last = chrono[chrono.length - 1];
     const promo = applyPromo(chrono);
+    const combo = comboOf(chrono);
     const subtotal = chrono.reduce((t, o) => t + o.total, 0);
     const paid = chrono.every((o) => o.status === "pagado");
     const cort = courtesyOf(chrono, CORTESIA_TRAGOS_DEFAULT);
@@ -375,7 +450,8 @@ export function buildAccounts(orders: Order[]): BscAccount[] {
       orders: chrono,
       subtotal,
       promo,
-      total: subtotal - promo.amount,
+      combo,
+      total: subtotal - promo.amount - combo.amount,
       paid,
       lastAt: last.createdAt,
       pendingPrep: chrono.filter((o) => prepOf(o) !== "entregado").length,
@@ -399,6 +475,9 @@ export interface BscTotals {
   porCobrar: number;
   promos: number;
   promoMonto: number;
+  /** Promo por pares: cuántos pares se aplicaron y cuánto descontaron. ventas + promoMonto + comboMonto = bruto. */
+  combos: number;
+  comboMonto: number;
   /** Lo cobrado, por método (las cuentas pagadas sin método van en «sin»). */
   porMetodo: Record<BscPay | "sin", number>;
   /** Cortesías (las da el restaurante): cuántas se dieron por opción y cuántas faltan por entregar. No suman a las ventas. */
@@ -458,6 +537,15 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
     if (a.paid) row.cobrado -= a.promo.amount;
     else row.porCobrar -= a.promo.amount;
   }
+  // promo por pares: descuenta de «tragos de la casa»
+  for (const a of accounts) {
+    if (a.combo.amount <= 0) continue;
+    const row = catRow("tragos");
+    row.promo += a.combo.amount;
+    row.facturado -= a.combo.amount;
+    if (a.paid) row.cobrado -= a.combo.amount;
+    else row.porCobrar -= a.combo.amount;
+  }
   const sum = (f: (a: BscAccount) => number, pick: (a: BscAccount) => boolean = () => true) => accounts.filter(pick).reduce((t, a) => t + f(a), 0);
   const porMetodo: BscTotals["porMetodo"] = { efectivo: 0, sinpe: 0, tarjeta: 0, sin: 0 };
   for (const a of accounts) if (a.paid) porMetodo[a.pay || "sin"] += a.total;
@@ -470,6 +558,8 @@ export function eventTotals(accounts: BscAccount[]): BscTotals {
     porCobrar: sum((a) => a.total, (a) => !a.paid),
     promos: accounts.filter((a) => a.promo.applied).length,
     promoMonto: sum((a) => a.promo.amount),
+    combos: sum((a) => a.combo.bundles),
+    comboMonto: sum((a) => a.combo.amount),
     porMetodo,
     cortesias,
     cats,
@@ -536,6 +626,7 @@ export function accountsCsv(accounts: BscAccount[]): string {
       }
     }
     if (a.promo.applied) rows.push([a.name, a.whatsapp, a.table, "", "", "", "", `Promo: ${a.promo.item?.name || ""} incluido`, "", 1, -a.promo.amount, -a.promo.amount, "", "", ""]);
+    if (a.combo.amount > 0) rows.push([a.name, a.whatsapp, a.table, "", "", "", "", `Promo ${a.combo.qty} tragos por ${a.combo.price} (${a.combo.bundles} ${a.combo.bundles === 1 ? "par" : "pares"})`, "", a.combo.bundles, "", -a.combo.amount, "", "", ""]);
     rows.push([a.name, a.whatsapp, a.table, "", "", "", "", "TOTAL DE LA CUENTA", "", "", "", a.total, a.paid ? "Pagada" : "Abierta", a.pay ? PAY_LABEL[a.pay] : "", a.paidAt ? crTime(a.paidAt) : ""]);
   }
   return "﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n");
@@ -592,6 +683,12 @@ export function normalizeBsc(raw: Partial<BscSettings> | null | undefined, defau
       return { id, ...(d ? { desc: d } : {}) };
     }),
   };
+  const rawK = (r as Partial<BscSettings>).combo;
+  const combo: BscSettings["combo"] = {
+    enabled: rawK?.enabled === undefined ? defaults.combo.enabled : rawK.enabled !== false,
+    qty: Math.min(6, Math.max(2, Math.floor(Number(rawK?.qty)) || defaults.combo.qty)),
+    price: Math.floor(Number(rawK?.price)) > 0 ? Math.min(1_000_000, Math.floor(Number(rawK?.price))) : defaults.combo.price,
+  };
   return {
     enabled: r.enabled === undefined ? defaults.enabled : r.enabled !== false,
     slug: defaults.slug,
@@ -603,6 +700,8 @@ export function normalizeBsc(raw: Partial<BscSettings> | null | undefined, defau
     availableUntil: until,
     items: items.length ? migrateItems(items) : defaults.items,
     cortesia,
+    combo,
+    autoWeekly: r.autoWeekly === undefined ? defaults.autoWeekly : r.autoWeekly !== false,
   };
 }
 

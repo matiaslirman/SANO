@@ -11,7 +11,7 @@ import type { TrackEvent } from "./track";
 import { normalizeEmail } from "./contact";
 import { topDishes } from "./favorites";
 import { normalizeViaje, isRealDate, longDate, type ViajeOrderCheck } from "./viaje";
-import { normalizeBsc, type BscOrderCheck } from "./bsc";
+import { normalizeBsc, rollEdition, type BscOrderCheck } from "./bsc";
 
 const K = {
   settings: "sano:settings",
@@ -283,13 +283,29 @@ export const store = {
 
   // ── Bistro Social Club (evento temporal) ────────────────────
   async getBsc(): Promise<BscSettings> {
+    let current: BscSettings;
     if (isPersistent()) {
       const v = (await redis().get<Partial<BscSettings>>(K.bsc)) || null;
-      if (!v) return DEFAULT_BSC;
-      return normalizeBsc(v, DEFAULT_BSC);
+      current = v ? normalizeBsc(v, DEFAULT_BSC) : DEFAULT_BSC;
+    } else {
+      const db = await readFile();
+      current = db.bsc ? normalizeBsc(db.bsc, DEFAULT_BSC) : DEFAULT_BSC;
     }
-    const db = await readFile();
-    return db.bsc || DEFAULT_BSC;
+    // apertura semanal automática: si la ventana ya terminó (con margen), pasa a la del próximo jueves y se guarda
+    const rolled = rollEdition(current, new Date());
+    if (rolled !== current) {
+      try {
+        if (isPersistent()) await redis().set(K.bsc, rolled);
+        else {
+          const db = await readFile();
+          db.bsc = rolled;
+          await writeFile(db);
+        }
+      } catch {
+        /* si no se pudo guardar, igual se devuelve la edición que corresponde (se vuelve a calcular en la próxima lectura) */
+      }
+    }
+    return rolled;
   },
 
   async saveBsc(patch: Partial<BscSettings>): Promise<BscSettings> {
@@ -331,6 +347,7 @@ export const store = {
       bscPrep: "recibido",
       bscEdition: meta.edition,
       bscBy: meta.by,
+      ...(c.combo ? { bscCombo: c.combo } : {}),
       ...(c.table ? { bscTable: c.table } : {}),
     };
     if (isPersistent()) {

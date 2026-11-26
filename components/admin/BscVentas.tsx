@@ -29,7 +29,7 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
     }
     rows.push([], ["Ingreso por categoría", "Unidades", "Bruto", "Promos", "Facturado", "Cobrado", "Por cobrar"]);
     for (const c of t.cats) rows.push([c.name, c.qty, c.bruto, -c.promo, c.facturado, c.cobrado, c.porCobrar]);
-    rows.push([], ["", "Bruto", "", "", "", "", t.bruto], ["", "Promos", "", "", "", "", -t.promoMonto], ["", "Facturado", "", "", "", "", t.ventas]);
+    rows.push([], ["", "Bruto", "", "", "", "", t.bruto], ["", "Promos de la primera edición", "", "", "", "", -t.promoMonto], ["", `Promo por pares (${t.combos} ${t.combos === 1 ? "par" : "pares"})`, "", t.combos, "", "", -t.comboMonto], ["", "Facturado", "", "", "", "", t.ventas]);
     for (const [id, v] of Object.entries(t.cortesias.porOpcion).sort(([a], [b]) => a.localeCompare(b))) rows.push(["", `Cortesías · ${cortesiaLabel(id)}`, "", v.total, "", v.pendientes, 0]);
     rows.push(["", "Cobrado", "", "", "", "", t.cobrado], ["", "Por cobrar", "", "", "", "", t.porCobrar]);
     for (const k of ["efectivo", "sinpe", "tarjeta", "sin"] as const) rows.push(["", `Cobrado · ${PAY_LABEL[k]}`, "", "", "", "", t.porMetodo[k]]);
@@ -146,6 +146,7 @@ export function BscVentas({ orders, allOrders, edition, onPick }: { orders: Orde
             <tfoot>
               <tr><td colSpan={4}>Bruto (todo lo pedido)</td><td className="n tnum">{crc(t.bruto)}</td></tr>
               {t.promoMonto > 0 && <tr><td colSpan={4}>Promos de la primera edición ({t.promos} {t.promos === 1 ? "cuenta" : "cuentas"})</td><td className="n tnum">−{crc(t.promoMonto)}</td></tr>}
+              {t.comboMonto > 0 && <tr><td colSpan={4}>Promo por pares de tragos ({t.combos} {t.combos === 1 ? "par" : "pares"})</td><td className="n tnum">−{crc(t.comboMonto)}</td></tr>}
               <tr className="fin"><td colSpan={4}>Facturado</td><td className="n tnum">{crc(t.ventas)}</td></tr>
             </tfoot>
           </table>

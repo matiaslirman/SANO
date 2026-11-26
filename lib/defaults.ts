@@ -245,4 +245,6 @@ export const DEFAULT_BSC: BscSettings = {
     { id: "hummus", cat: "picar", name: "Hummus", price: 3000, active: true, image: "hummus.jpg", desc: "Con vegetales." },
   ],
   cortesia: { tragos: 1, options: [{ id: "1" }, { id: "2" }] },
+  combo: { enabled: true, qty: 2, price: 9000 },
+  autoWeekly: true,
 };

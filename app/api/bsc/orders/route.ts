@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     : undefined;
 
   return NextResponse.json(
-    { order: { id: order.id, createdAt: order.createdAt, bscEdition: order.bscEdition, customerName: order.customerName, bsc: order.bsc, total: order.total, bscTable: order.bscTable }, account },
+    { order: { id: order.id, createdAt: order.createdAt, bscEdition: order.bscEdition, customerName: order.customerName, bsc: order.bsc, total: order.total, discount: check.discount, bscTable: order.bscTable }, account },
     { status: 201 }
   );
 }

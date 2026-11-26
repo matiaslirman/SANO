@@ -6,6 +6,7 @@ import {
   bscState, bscOpen, crLocalToIso, isoToCrLocal, crDateTimeLabel, crTime, checkBscOrder, applyPromo, accountKey,
   buildAccounts, eventTotals, accountsCsv, normalizeBsc, priceLabel,
   crDate, orderEdition, editionLabel, nextEditionPatch, slugId, moveItem, salesByHour, editionsSummary, LEGACY_EDITION,
+  comboAmount, comboOf, rollEdition,
 } from "../lib/bsc.ts";
 import { DEFAULT_BSC } from "../lib/defaults.ts";
 import type { Order, OrderBscLine } from "../lib/types.ts";
@@ -482,6 +483,98 @@ assert.equal(buildAccounts([old1])[0].promo.amount, 3000);
   assert.equal(tn.ventas, 18000);
   // sin pedidos: las tres categorías en cero
   assert.deepEqual(eventTotals([]).cats.map((c) => c.facturado), [0, 0, 0]);
+}
+
+// ═══ Promo por pares (2 tragos por ₡9.000) y apertura semanal automática ═══════════
+{
+  const cfg = { qty: 2, price: 9000 };
+  const T = (qty: number, up = 5000, extra: Partial<OrderBscLine> = {}): OrderBscLine => ({ id: "gin-tonic", cat: "tragos", name: "Gin Tonic", qty, unitPrice: up, subtotal: up * qty, promoTrigger: true, ...extra });
+  // por cada par: 1 → 0, 2 → 1.000, 3 → 1.000, 4 → 2.000, 5 → 2.000
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map((n) => comboAmount([T(n)], cfg).amount), [0, 1000, 1000, 2000, 2000, 3000]);
+  assert.equal(comboAmount([T(2)], cfg).bundles, 1);
+  // se pueden mezclar tragos distintos; cerveza, vino y cortesía no cuentan
+  assert.equal(comboAmount([T(1), { ...T(1), id: "paloma", name: "Paloma" }], cfg).amount, 1000);
+  assert.equal(comboAmount([T(1), { id: "cerveza", cat: "bebidas", name: "Cerveza", qty: 1, unitPrice: 2000, subtotal: 2000 }], cfg).amount, 0);
+  assert.equal(comboAmount([T(1), { id: CORTESIA_ID, cat: "cortesia", name: "Cortesía · Opción 1", qty: 1, unitPrice: 0, subtotal: 0, cortesia: "1" }], cfg).amount, 0);
+  // aunque el par saliera con descuento, cerveza y vino NO entran a la promo (solo los tragos de la casa)
+  assert.equal(comboAmount([T(1), { id: "cerveza", cat: "bebidas", name: "Cerveza", qty: 1, unitPrice: 2000, subtotal: 2000 }], { qty: 2, price: 6000 }).amount, 0);
+  // si el par ya sale más barato que ₡9.000, no se «encarece»
+  assert.equal(comboAmount([T(2, 4000)], cfg).amount, 0);
+  assert.equal(comboAmount([T(4)], undefined).amount, 0); // sin promo
+  assert.equal(comboAmount([T(4)], { qty: 1, price: 1 }).amount, 0); // un «par» de uno no es una promo
+
+  // el servidor: descuento de ESTE pedido contando los tragos que la persona ya tenía
+  const P = { ...S_DEFAULT, items: S_DEFAULT.items };
+  const c2 = checkBscOrder({ customerName: "Par", lines: [{ id: "gin-tonic", variantId: "clasico", qty: 2 }] }, P, NOW);
+  assert.ok(c2.ok && c2.total === 10000 && c2.discount === 1000 && c2.combo?.price === 9000);
+  const c1 = checkBscOrder({ customerName: "Par", lines: [{ id: "gin-tonic", variantId: "clasico", qty: 1 }] }, P, NOW);
+  assert.ok(c1.ok && c1.discount === 0);
+  const before = [mk("SANO-1", [T(1)])]; // ya tenía 1 trago: el segundo cierra el par
+  const c3 = checkBscOrder({ customerName: "Par", lines: [{ id: "playero", qty: 1 }] }, P, NOW, { accountOrders: before });
+  assert.ok(c3.ok && c3.discount === 1000);
+  const c4 = checkBscOrder({ customerName: "Par", lines: [{ id: "playero", qty: 2 }] }, P, NOW, { accountOrders: before }); // 1 + 2 = 3 tragos → un par
+  assert.ok(c4.ok && c4.discount === 1000);
+  const c5 = checkBscOrder({ customerName: "Par", lines: [{ id: "playero", qty: 1 }] }, P, NOW, { accountOrders: [mk("SANO-1", [T(2)])] }); // 2 + 1: el tercero paga normal
+  assert.ok(c5.ok && c5.discount === 0);
+  const off = { ...P, combo: { ...P.combo, enabled: false } };
+  const c6 = checkBscOrder({ customerName: "Par", lines: [{ id: "gin-tonic", variantId: "clasico", qty: 2 }] }, off, NOW);
+  assert.ok(c6.ok && c6.discount === 0 && c6.combo === undefined);
+
+  // las cuentas: el descuento de pedidos sucesivos suma lo mismo que el de la cuenta completa
+  const mkCombo = (name: string, phone: string, at: string, lines: OrderBscLine[], status: "pendiente" | "pagado" = "pendiente") => ({ ...O(name, phone, at, lines, status, "entregado"), bscCombo: cfg });
+  const strip = (l: OrderBscLine): OrderBscLine => { const { promoEligible: _p, ...rest } = l; return rest; }; // sin la marca de la primera edición
+  const o1 = mkCombo("Dos Pedidos", "7777 0001", T0, [strip(trago(1))]);
+  const o2 = mkCombo("Dos Pedidos", "7777 0001", T1, [strip(playero(1))]);
+  const o3 = mkCombo("Dos Pedidos", "7777 0001", T2, [strip(trago(1)), strip(cerveza(2))]);
+  const acc = buildAccounts([o1, o2, o3])[0];
+  assert.equal(acc.subtotal, 5000 * 3 + 4000);
+  assert.deepEqual([acc.combo.bundles, acc.combo.amount], [1, 1000]); // 3 tragos = un par
+  assert.equal(acc.total, acc.subtotal - 1000);
+  assert.equal(acc.tragos, 3);
+  // una persona sin la promo en sus pedidos (anteriores a esta regla) no recibe descuento
+  assert.equal(buildAccounts([O("Vieja Regla", "7777 0002", T0, [strip(trago(2))])])[0].combo.amount, 0);
+
+  // totales: bruto − promo vieja − pares = facturado, y las categorías siguen cuadrando
+  const pagada = mkCombo("Cuatro", "7777 0003", T0, [strip(trago(4))], "pagado");
+  const ab = mkCombo("Solo uno", "7777 0004", T1, [strip(trago(1)), strip(plato())]);
+  const t2 = eventTotals(buildAccounts([pagada, ab, o1, o2, o3]));
+  assert.equal(t2.comboMonto, 2000 + 0 + 1000);
+  assert.equal(t2.combos, 3);
+  assert.equal(t2.bruto - t2.promoMonto - t2.comboMonto, t2.ventas);
+  const k = Object.fromEntries(t2.cats.map((c) => [c.cat, c]));
+  assert.equal(k.tragos.promo, 3000);
+  assert.equal(t2.cats.reduce((n, c) => n + c.facturado, 0), t2.ventas);
+  assert.equal(t2.cats.reduce((n, c) => n + c.cobrado, 0), t2.cobrado);
+  assert.equal(t2.cats.reduce((n, c) => n + c.porCobrar, 0), t2.porCobrar);
+  assert.equal(t2.cobrado, 20000 - 2000); // «Cuatro»: 4 tragos = ₡18.000
+  assert.ok(accountsCsv(buildAccounts([o1, o2, o3])).includes("Promo 2 tragos por 9000 (1 par)"));
+  // pedido que guarda la promo vigente: el servidor la copia en el pedido
+  assert.deepEqual((c2.ok ? c2.combo : null), { qty: 2, price: 9000 });
+
+  // configuración: valores saneados y por defecto activada
+  assert.deepEqual(normalizeBsc({}, S_DEFAULT).combo, { enabled: true, qty: 2, price: 9000 });
+  assert.deepEqual(normalizeBsc({ combo: { enabled: true, qty: 99, price: -5 } }, S_DEFAULT).combo, { enabled: true, qty: 6, price: 9000 });
+  assert.equal(normalizeBsc({ combo: { enabled: false, qty: 2, price: 8000 } }, S_DEFAULT).combo.enabled, false);
+  assert.equal(normalizeBsc({}, S_DEFAULT).autoWeekly, true);
+  assert.equal(normalizeBsc({ autoWeekly: false }, S_DEFAULT).autoWeekly, false);
+}
+{
+  // ── apertura semanal: avanza sola de a 7 días, con 24 h de margen tras terminar la ventana ──
+  const base = { autoWeekly: true, editionId: "2026-11-26", startsAt: "2026-11-26T19:30:00-06:00", availableFrom: "2026-11-26T00:00:00-06:00", availableUntil: "2026-11-27T08:00:00-06:00" };
+  const at = (iso: string) => new Date(iso);
+  assert.equal(rollEdition(base, at("2026-11-27T07:59:00-06:00")), base); // dentro de la ventana: no cambia (misma referencia)
+  assert.equal(rollEdition(base, at("2026-11-28T07:59:00-06:00")), base); // viernes y madrugada del sábado: aún es «en curso»
+  const r1 = rollEdition(base, at("2026-11-28T08:01:00-06:00"));
+  assert.deepEqual([r1.editionId, r1.startsAt, r1.availableFrom, r1.availableUntil], ["2026-12-03", "2026-12-03T19:30:00-06:00", "2026-12-03T00:00:00-06:00", "2026-12-04T08:00:00-06:00"]);
+  assert.equal(bscState(at("2026-11-28T09:00:00-06:00"), r1 as never), "before"); // el resto de la semana: todavía no abre
+  assert.equal(bscState(at("2026-12-03T00:01:00-06:00"), r1 as never), "open"); // el jueves a las 00:00 abre sola
+  // si nadie entró en semanas: salta hasta la ventana vigente
+  const r3 = rollEdition(base, at("2026-12-20T12:00:00-06:00"));
+  assert.equal(r3.editionId, "2026-12-24");
+  assert.equal(rollEdition(r3, at("2026-12-20T12:00:00-06:00")), r3); // idempotente
+  // apagada: no se mueve nada
+  const manual = { ...base, autoWeekly: false };
+  assert.equal(rollEdition(manual, at("2027-03-01T00:00:00-06:00")), manual);
 }
 
 console.log("bsc (cortesía y carpaccio): todos los tests OK");

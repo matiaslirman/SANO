@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { BscCatId, BscItem, BscSettings } from "@/lib/types";
+import { crc } from "@/lib/format";
 import { BSC_CATS, BSC_PHOTOS, crLocalToIso, editionLabel, isoToCrLocal, moveItem, nextEditionPatch, slugId } from "@/lib/bsc";
 
 /** Carta y edición: se agregan, quitan y ordenan platos y bebidas; se fijan las fechas y se arranca la próxima edición. */
@@ -15,6 +16,10 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
   const [items, setItems] = useState<BscItem[]>(settings.items);
   const [cTragos, setCTragos] = useState<number>(settings.cortesia.tragos);
   const [cDesc, setCDesc] = useState<Record<string, string>>({ "1": settings.cortesia.options.find((o) => o.id === "1")?.desc || "", "2": settings.cortesia.options.find((o) => o.id === "2")?.desc || "" });
+  const [comboOn, setComboOn] = useState(settings.combo.enabled);
+  const [comboQty, setComboQty] = useState<number>(settings.combo.qty);
+  const [comboPrice, setComboPrice] = useState<number>(settings.combo.price);
+  const [auto, setAuto] = useState(settings.autoWeekly);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -85,6 +90,8 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
         body: JSON.stringify({
           enabled, name, venue, startsAt: s, availableFrom: f, availableUntil: u, items: prepared,
           cortesia: { tragos: cTragos, options: [{ id: "1", desc: cDesc["1"] }, { id: "2", desc: cDesc["2"] }] },
+          combo: { enabled: comboOn, qty: comboQty, price: comboPrice },
+          autoWeekly: auto,
           ...extra,
         }),
       });
@@ -121,6 +128,10 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
     <>
       <div className="editcard bsc-adm-edit">
         <h3>Edición y fechas</h3>
+        <label className="chk" style={{ margin: "4px 0 10px", display: "flex", alignItems: "center", gap: 8, minHeight: 44 }}>
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+          <span><b>Abrir sola cada semana.</b> Cuando termina la ventana de pedidos, la edición pasa sola al próximo jueves (mismas horas) y la carta y la promo se quedan como están. Abre a las 00:00 del jueves.</span>
+        </label>
         <div className="sub">
           Edición en curso: <b>{editionLabel(settings.editionId)}</b>. Cada edición tiene su propia comanda y sus propios totales. La ventana (hora de Costa Rica) la valida el servidor:
           fuera de ella los clientes no pueden pedir, aunque tengan la página abierta.
@@ -142,6 +153,23 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
           <div />
           <div className="field"><label>Se ve y recibe pedidos desde</label><input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
           <div className="field"><label>Hasta</label><input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} /></div>
+        </div>
+      </div>
+
+      <div className="editcard bsc-adm-edit">
+        <h3>Promo de tragos</h3>
+        <div className="sub">
+          Cada <b>{comboQty} tragos de la casa</b> en la cuenta de una persona valen <b>{crc(comboPrice)}</b> (se calcula sobre todos sus pedidos de la noche y se pueden combinar).
+          El trago que sobra paga su precio normal. Cerveza, vino y la cortesía no cuentan.
+        </div>
+        <div className="ev-grid">
+          <label className="chk"><input type="checkbox" checked={comboOn} onChange={(e) => setComboOn(e.target.checked)} /> Promo activa</label>
+          <div />
+          <div className="field"><label>Tragos por promo</label><input type="number" min={2} max={6} value={comboQty} onChange={(e) => setComboQty(parseInt(e.target.value) || 2)} /></div>
+          <div className="field"><label>Precio de la promo (₡)</label><input type="number" min={0} step={500} value={comboPrice} onChange={(e) => setComboPrice(parseInt(e.target.value) || 0)} /></div>
+        </div>
+        <div>
+          <button className="save-btn" onClick={() => save()} disabled={busy}>{busy ? "Guardando…" : "Guardar cambios"}</button>
         </div>
       </div>
 
@@ -194,7 +222,7 @@ export function BscEditor({ settings, onSaved }: { settings: BscSettings; onSave
                 <div className="row opts">
                   <label className="chk"><input type="checkbox" checked={i.active} onChange={(e) => setItem(i.id, { active: e.target.checked })} /> Visible</label>
                   {cat.id !== "picar" && (
-                    <label className="chk"><input type="checkbox" checked={!!i.promoTrigger} onChange={(e) => setItem(i.id, { promoTrigger: e.target.checked })} /> Cuenta para la cortesía</label>
+                    <label className="chk"><input type="checkbox" checked={!!i.promoTrigger} onChange={(e) => setItem(i.id, { promoTrigger: e.target.checked })} /> Cuenta para cortesía y promo de pares</label>
                   )}
                 </div>
                 {i.variants?.map((v) => (
